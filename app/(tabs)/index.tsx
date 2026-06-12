@@ -1561,7 +1561,7 @@ export default function HomeScreen() {
                 <Text style={s.cardTitle}>오늘의 상태 척도</Text>
                 <Text style={s.cardDesc}>1(낮음) ~ 10(높음)으로 표시해 주세요.</Text>
               </View>
-              <TouchableOpacity style={s.assessMiniBtn} onPress={() => setAssessPickerVisible(true)} activeOpacity={0.8}>
+              <TouchableOpacity style={s.assessMiniBtn} onPress={() => router.push('/(surveys)/evaluation-hub' as any)} activeOpacity={0.8}>
                 <ClipboardList size={12} color="rgba(255,255,255,0.6)" />
                 <Text style={s.assessMiniBtnText}>정밀 평가</Text>
               </TouchableOpacity>

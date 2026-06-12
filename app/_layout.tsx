@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { Platform, StyleSheet } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SQLiteProvider, defaultDatabaseDirectory } from 'expo-sqlite';
 import { Paths } from 'expo-file-system';
@@ -8,8 +8,9 @@ import * as Notifications from 'expo-notifications';
 import { registerWidgetTaskHandler } from 'react-native-android-widget';
 import { initializeDatabase } from '../src/db/schema';
 import { widgetTaskHandler } from '../widgets/WidgetTaskHandler';
+import { supabase } from '../src/lib/supabase';
+import { useAuthStore } from '../src/store/useAuthStore';
 
-// Android 홈 화면 위젯 이벤트 수신 등록 (앱 시작 시 한 번)
 if (Platform.OS === 'android') {
   registerWidgetTaskHandler(widgetTaskHandler);
 }
@@ -24,12 +25,51 @@ Notifications.setNotificationHandler({
   }),
 });
 
-export default function RootLayout() {
+// ── 보호 라우팅 훅 ────────────────────────────────────────────────────────────
+// session 확인 전(loaded=false)에는 라우팅하지 않아 깜빡임을 방지
+function useProtectedRoute() {
+  const { session, loaded } = useAuthStore();
+  const segments = useSegments();
+  const router   = useRouter();
+
+  useEffect(() => {
+    if (!loaded) return;
+
+    const inAuth = segments[0] === '(auth)';
+
+    if (!session && !inAuth) {
+      router.replace('/(auth)/login');
+    } else if (session && inAuth) {
+      router.replace('/(tabs)');
+    }
+  }, [session, loaded, segments]);
+}
+
+// ── 내부 레이아웃 (훅은 Stack 하위에서 사용해야 함) ────────────────────────────
+function InnerLayout() {
+  const { setSession, setLoaded } = useAuthStore();
+
+  useEffect(() => {
+    // 앱 시작 시 저장된 세션을 복원 — onAuthStateChange 첫 이벤트가 INITIAL_SESSION
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setSession(session);
+        setLoaded(true);
+      }
+    );
+    return () => subscription.unsubscribe();
+  }, []);
+
   useEffect(() => {
     Notifications.requestPermissionsAsync().catch(() => {});
   }, []);
 
-  // iOS: App Group 공유 컨테이너 경로 → 위젯 extension과 SQLite DB 파일 공유
+  useProtectedRoute();
+
+  return <Stack screenOptions={{ headerShown: false }} />;
+}
+
+export default function RootLayout() {
   const dbDirectory = useMemo(() => {
     if (Platform.OS === 'ios') {
       const shared = Paths.appleSharedContainers['group.com.lhj4071.olivemind'];
@@ -45,7 +85,7 @@ export default function RootLayout() {
         directory={dbDirectory}
         onInit={initializeDatabase}
       >
-        <Stack screenOptions={{ headerShown: false }} />
+        <InnerLayout />
       </SQLiteProvider>
     </GestureHandlerRootView>
   );
