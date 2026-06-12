@@ -1,0 +1,87 @@
+{
+  "expo": {
+    "name": "olive-mind",
+    "slug": "olive-mind",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "olivemind",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.lhj4071.olivemind",
+      "entitlements": {
+        "com.apple.security.application-groups": ["group.com.lhj4071.olivemind"]
+      }
+    },
+    "android": {
+      "package": "com.lhj4071.olivemind",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#534AB7"
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ],
+      "expo-sqlite",
+      [
+        "expo-widgets",
+        {
+          "groupIdentifier": "group.com.lhj4071.olivemind",
+          "widgets": [
+            {
+              "name": "OliveMindWidget",
+              "displayName": "올리브 마인드",
+              "description": "올리브 나무 상태와 오늘의 루틴 진행도를 확인하세요",
+              "supportedFamilies": ["systemSmall", "systemMedium"]
+            }
+          ]
+        }
+      ],
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "OliveMindWidget",
+              "label": "올리브 마인드 위젯",
+              "minWidth": "160dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 2,
+              "targetCellHeight": 2,
+              "description": "올리브 나무 상태와 오늘의 루틴 진행도",
+              "previewImage": "@mipmap/ic_launcher",
+              "updatePeriodMillis": 0
+            }
+          ]
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "enabledPlugins": {
+    "expo@claude-plugins-official": true
+  },
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"const pkg = require\\('./package.json'\\); console.log\\(pkg.dependencies['expo-av'] || 'NOT INSTALLED'\\);\")"
+    ]
+  }
+}
