@@ -21,6 +21,8 @@ import { AppState, type AppStateStatus } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import type { Video } from 'expo-av';
 import { refreshWidget } from '../widget/widgetData';
+import { supabase } from '../lib/supabase';
+import { pushBreathingLog } from '../lib/syncService';
 
 // ── 공개 상수 ─────────────────────────────────────────────────────────────────
 
@@ -144,12 +146,25 @@ export function useBreathSession(
 
     // ① DB UPSERT 완료 후 ② 위젯 갱신 (await 체인으로 순서 보장)
     try {
+      const today = localDateKey();
       await db.runAsync(
         `INSERT INTO BreathingLogs (date, count) VALUES (?, 1)
          ON CONFLICT(date) DO UPDATE SET count = count + 1`,
-        [localDateKey()],
+        [today],
       );
       await refreshWidget(db); // ← DB 커밋 후 즉시 호출
+
+      // Supabase 동기화 (fire-and-forget): DB에서 최신 count 읽어 upsert
+      db.getFirstAsync<{ count: number }>(
+        'SELECT count FROM BreathingLogs WHERE date = ?', [today],
+      ).then(row => {
+        if (!row) return;
+        supabase.auth.getSession()
+          .then(({ data: { session } }) => {
+            if (session) pushBreathingLog(session.user.id, today, row.count).catch(() => {});
+          })
+          .catch(() => {});
+      }).catch(() => {});
     } catch { /* 비차단: 완료 UX는 이미 표시됨 */ }
 
     completingRef.current = false;

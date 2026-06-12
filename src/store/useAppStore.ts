@@ -24,6 +24,15 @@ import type {
   SliderValues,
   AssessType,
 } from '../types/app';
+import { supabase } from '../lib/supabase';
+import { pushMoodLog, pushRoutineLog, pushUserStats, pushSleepSettings } from '../lib/syncService';
+
+// Supabase 푸시용 fire-and-forget 래퍼 — 세션 없거나 네트워크 오류 시 조용히 무시
+function withUid(fn: (uid: string) => Promise<void>): void {
+  supabase.auth.getSession()
+    .then(({ data: { session } }) => { if (session) fn(session.user.id).catch(() => {}); })
+    .catch(() => {});
+}
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
@@ -328,6 +337,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
         }));
       }
       refreshWidget(db).catch(() => {});
+      // Supabase 동기화 (fire-and-forget)
+      withUid(uid => pushMoodLog(uid, { date: today, score: scoreJson, tags: tagsJson, memo: note }));
     } catch (err) {
       // 롤백
       set(state => ({
@@ -367,6 +378,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
       // UPSERT 완료 후 디바운스 갱신:
       // 연속 터치 N회 → 마지막 500ms 정지 후 위젯 1회만 업데이트
       scheduleWidgetRefresh(db);
+      // Supabase 동기화 (fire-and-forget)
+      withUid(uid => pushRoutineLog(uid, localDateKey(), JSON.stringify(newCounts), db));
     } catch (err) {
       set({ routineCounts: prevCounts });
       console.error('[AppStore] adjustRoutineCount 실패:', err);
@@ -463,6 +476,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
          ON CONFLICT(key) DO UPDATE SET value = value + 1`,
       );
       refreshWidget(db).catch(() => {});
+      // Supabase 동기화 (fire-and-forget)
+      withUid(uid => pushUserStats(uid, prev + 1));
     } catch (err) {
       set({ harvestedCount: prev });
       console.error('[AppStore] harvestOlive 실패:', err);
@@ -493,6 +508,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
           [bedTime, wakeTime, notifId],
         );
       }
+      withUid(uid => pushSleepSettings(uid, bedTime, wakeTime, true));
     } catch (err) {
       set(prev);
       console.error('[AppStore] saveSleepSettings 실패:', err);

@@ -83,4 +83,10 @@ export async function initializeDatabase(db: SQLiteDatabase): Promise<void> {
       value INTEGER NOT NULL DEFAULT 0
     );
   `);
+
+  // Safe migration: add supabase_id to RoutineItems for cross-platform UUID mapping.
+  // ALTER TABLE fails with "duplicate column name" if column already exists — that's fine.
+  try {
+    await db.execAsync('ALTER TABLE RoutineItems ADD COLUMN supabase_id TEXT;');
+  } catch { /* column already exists on subsequent app launches */ }
 }

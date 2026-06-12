@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { Platform, StyleSheet } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { SQLiteProvider, defaultDatabaseDirectory } from 'expo-sqlite';
+import { SQLiteProvider, defaultDatabaseDirectory, useSQLiteContext } from 'expo-sqlite';
 import { Paths } from 'expo-file-system';
 import * as Notifications from 'expo-notifications';
 import { registerWidgetTaskHandler } from 'react-native-android-widget';
@@ -10,6 +10,8 @@ import { initializeDatabase } from '../src/db/schema';
 import { widgetTaskHandler } from '../widgets/WidgetTaskHandler';
 import { supabase } from '../src/lib/supabase';
 import { useAuthStore } from '../src/store/useAuthStore';
+import { useAppStore } from '../src/store/useAppStore';
+import { pullFromSupabase } from '../src/lib/syncService';
 
 if (Platform.OS === 'android') {
   registerWidgetTaskHandler(widgetTaskHandler);
@@ -47,14 +49,22 @@ function useProtectedRoute() {
 
 // ── 내부 레이아웃 (훅은 Stack 하위에서 사용해야 함) ────────────────────────────
 function InnerLayout() {
+  const db = useSQLiteContext();
   const { setSession, setLoaded } = useAuthStore();
 
   useEffect(() => {
     // 앱 시작 시 저장된 세션을 복원 — onAuthStateChange 첫 이벤트가 INITIAL_SESSION
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (event, session) => {
         setSession(session);
         setLoaded(true);
+
+        // 로그인 또는 앱 재시작 시 Supabase → SQLite pull 후 스토어 갱신
+        if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
+          pullFromSupabase(db)
+            .then(() => useAppStore.getState().refresh(db))
+            .catch(() => {});
+        }
       }
     );
     return () => subscription.unsubscribe();
