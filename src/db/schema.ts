@@ -84,9 +84,13 @@ export async function initializeDatabase(db: SQLiteDatabase): Promise<void> {
     );
   `);
 
-  // Safe migration: add supabase_id to RoutineItems for cross-platform UUID mapping.
-  // ALTER TABLE fails with "duplicate column name" if column already exists — that's fine.
-  try {
-    await db.execAsync('ALTER TABLE RoutineItems ADD COLUMN supabase_id TEXT;');
-  } catch { /* column already exists on subsequent app launches */ }
+  // Safe migrations: ALTER TABLE is idempotent — duplicate column errors are swallowed.
+  const migrations = [
+    'ALTER TABLE RoutineItems   ADD COLUMN supabase_id TEXT;',
+    // Medications.item_name: Supabase sync용 약물 한글명 (push 시 item_name 필드로 전송)
+    'ALTER TABLE Medications     ADD COLUMN item_name   TEXT;',
+  ];
+  for (const sql of migrations) {
+    try { await db.execAsync(sql); } catch { /* column already exists */ }
+  }
 }

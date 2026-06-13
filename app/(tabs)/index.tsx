@@ -1,7 +1,7 @@
 // app/(tabs)/index.tsx
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { CheckCircle, ChevronLeft, ChevronRight, Circle, ClipboardList, Leaf, Moon, Search, Settings, Wind, X } from 'lucide-react-native';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -37,6 +37,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { C as _C } from '../../src/styles/theme';
 import { FadeInView } from '../../src/components/DS';
 import { refreshWidget } from '../../src/widget/widgetData';
+import { fetchLatestGoalSession } from '../../src/lib/syncService';
+import { GOALS, ROUTINE_MAP, type Domain } from '../../src/constants/goalData';
 
 // ── Layout constants ──────────────────────────────────────────────────────────
 const SCREEN_W = Dimensions.get('window').width;
@@ -440,6 +442,12 @@ export default function HomeScreen() {
     top: 0, left: 0, right: 0, bottom: 0,
   }));
 
+  // ── Goal check-in card state ──────────────────────────────────────────────
+  const [hasGoalSession, setHasGoalSession] = useState(false);
+  const [goalCount,      setGoalCount]      = useState(0);
+  // routineLabel → goalText 역방향 맵 (배지 표시용)
+  const [goalLabelMap,   setGoalLabelMap]   = useState<Record<string, string>>({});
+
   // ── Routine state & animations ────────────────────────────────────────────
   const [routineItems,     setRoutineItems]     = useState<RoutineItem[]>([]);
   const [routineCounts,    setRoutineCounts]    = useState<Map<number, number>>(new Map());
@@ -557,6 +565,41 @@ export default function HomeScreen() {
     loadRoutineLog();
     loadCarePoints();
   }, [loadMoodLog, loadAssessmentData, loadSleepSettings, loadRoutineItems, loadRoutineLog, loadCarePoints]);
+
+  // 치료 목표 세션 로드 → 체크인 카드 + goalLabelMap
+  const loadGoalData = useCallback(async () => {
+    try {
+      const { data: { session } } = await (await import('../../src/lib/supabase')).supabase.auth.getSession();
+      if (!session) return;
+      const gs = await fetchLatestGoalSession(session.user.id);
+      if (!gs) { setHasGoalSession(false); setGoalLabelMap({}); return; }
+
+      const count = Object.values(gs.selectedGoals).flat().length;
+      setHasGoalSession(count > 0);
+      setGoalCount(count);
+
+      // routineLabel → goalText 역방향 맵
+      const map: Record<string, string> = {};
+      for (const domain of gs.selectedDomains as Domain[]) {
+        for (const goalId of gs.selectedGoals[domain] ?? []) {
+          const goalObj = GOALS[domain]?.find(g => g.id === goalId);
+          if (!goalObj || goalObj.is_custom) continue;
+          for (const r of ROUTINE_MAP[goalId] ?? []) {
+            map[r.text] = goalObj.text;
+          }
+        }
+      }
+      setGoalLabelMap(map);
+    } catch { /* 오프라인 시 무시 */ }
+  }, []);
+
+  useEffect(() => { loadGoalData(); }, [loadGoalData]);
+
+  // GoalSettingScreen에서 돌아올 때 루틴 + 목표 맵 즉시 갱신
+  useFocusEffect(useCallback(() => {
+    loadRoutineItems();
+    loadGoalData();
+  }, [loadRoutineItems, loadGoalData]));
 
   // Olive tree entrance animation on mount
   useEffect(() => {
@@ -1035,6 +1078,27 @@ export default function HomeScreen() {
     );
   };
 
+  // ── 주간 체크인 카드 ─────────────────────────────────────────────────────
+  const renderCheckInCard = () => {
+    if (!hasGoalSession) return null;
+    return (
+      <TouchableOpacity
+        style={s.checkInCard}
+        onPress={() => router.push('/goal-checkin' as any)}
+        activeOpacity={0.85}
+      >
+        <View style={s.checkInLeft}>
+          <Text style={s.checkInIcon}>🌿</Text>
+          <View>
+            <Text style={s.checkInTitle}>주간 체크인</Text>
+            <Text style={s.checkInDesc}>{goalCount}개의 목표를 점검할 수 있어요</Text>
+          </View>
+        </View>
+        <ChevronRight size={18} color={C.olive} />
+      </TouchableOpacity>
+    );
+  };
+
   // ── 오늘의 미니 루틴 ─────────────────────────────────────────────────────
   const renderDailyRoutines = () => {
     const total     = routineItems.length;
@@ -1056,8 +1120,17 @@ export default function HomeScreen() {
           {total === 0 ? (
             <View style={s.routineEmptyWrap}>
               <Text style={s.routineEmptyText}>아직 설정된 루틴이 없어요</Text>
+              <Text style={s.routineEmptyDesc}>오늘 하루, 잠시 쉬어가는 건 어떨까요?</Text>
+              {/* 치료 목표 설정 CTA */}
+              <TouchableOpacity
+                style={s.routineGoalCta}
+                onPress={() => router.push('/goal-setting' as any)}
+                activeOpacity={0.85}
+              >
+                <Text style={s.routineGoalCtaText}>🎯 나의 치료 목표와 루틴 설정하기</Text>
+              </TouchableOpacity>
               <TouchableOpacity style={s.routineEmptyBtn} onPress={() => setRoutineEditModal(true)} activeOpacity={0.8}>
-                <Text style={s.routineEmptyBtnText}>루틴 설정하기</Text>
+                <Text style={s.routineEmptyBtnText}>직접 루틴 추가하기</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -1068,10 +1141,11 @@ export default function HomeScreen() {
               <Text style={s.routineProgressLabel}>{doneCount} / {total} 완료</Text>
 
               {routineItems.map((item, idx) => {
-                const current  = routineCounts.get(item.id) ?? 0;
-                const done     = current >= item.targetCount;
-                const isToggle = item.targetCount === 1;
-                const animVal  = routineScaleAnims.current[idx];
+                const current    = routineCounts.get(item.id) ?? 0;
+                const done       = current >= item.targetCount;
+                const isToggle   = item.targetCount === 1;
+                const animVal    = routineScaleAnims.current[idx];
+                const linkedGoal = goalLabelMap[item.label];
 
                 return (
                   <RNAnimated.View
@@ -1101,10 +1175,19 @@ export default function HomeScreen() {
                           </TouchableOpacity>
                         </View>
                       )}
-                      {item.emoji ? <Text style={s.routineItemEmoji}>{item.emoji}</Text> : null}
-                      <Text style={[s.routineLabel, done && s.routineLabelDone]} numberOfLines={2}>
-                        {item.label}
-                      </Text>
+                      <View style={s.routineLabelWrap}>
+                        {item.emoji ? <Text style={s.routineItemEmoji}>{item.emoji}</Text> : null}
+                        <View style={s.routineLabelCol}>
+                          <Text style={[s.routineLabel, done && s.routineLabelDone]} numberOfLines={2}>
+                            {item.label}
+                          </Text>
+                          {linkedGoal ? (
+                            <View style={s.routineGoalBadge}>
+                              <Text style={s.routineGoalBadgeText} numberOfLines={1}>🎯 {linkedGoal}</Text>
+                            </View>
+                          ) : null}
+                        </View>
+                      </View>
                     </View>
                   </RNAnimated.View>
                 );
@@ -1551,6 +1634,9 @@ export default function HomeScreen() {
           {/* ── 불안 개입 배너 ── */}
           {renderAnxietyBanner()}
 
+          {/* ── 주간 체크인 카드 ── */}
+          {renderCheckInCard()}
+
           {/* ── 오늘의 미니 루틴 ── */}
           {renderDailyRoutines()}
 
@@ -1655,6 +1741,15 @@ export default function HomeScreen() {
 
       {/* ── 루틴 편집 모달 ── */}
       {renderRoutineEditModal()}
+
+      {/* ── 목표 설정 FAB ── */}
+      <TouchableOpacity
+        style={s.goalFab}
+        onPress={() => router.push('/goal-setting' as any)}
+        activeOpacity={0.85}
+      >
+        <Text style={s.goalFabText}>🎯</Text>
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -1863,6 +1958,50 @@ const s = StyleSheet.create({
   sleepPreviewText:{ fontSize: 13, color: C.oliveDark, fontWeight: '400', textAlign: 'center', lineHeight: 20 },
 
   // ── Daily Routines ────────────────────────────────────────────────────────
+  // ── Goal FAB ──────────────────────────────────────────────────────────────
+  goalFab: {
+    position:        'absolute',
+    bottom:          88,
+    right:           20,
+    width:           52,
+    height:          52,
+    borderRadius:    26,
+    backgroundColor: C.oliveFaded,
+    borderWidth:     1,
+    borderColor:     C.olive + '60',
+    alignItems:      'center',
+    justifyContent:  'center',
+    shadowColor:     C.olive,
+    shadowOpacity:   0.25,
+    shadowRadius:    8,
+    shadowOffset:    { width: 0, height: 4 },
+    elevation:       6,
+  },
+  goalFabText: { fontSize: 22 },
+
+  // ── Check-in card ─────────────────────────────────────────────────────────
+  checkInCard: {
+    flexDirection:    'row',
+    alignItems:       'center',
+    justifyContent:   'space-between',
+    backgroundColor:  C.card,
+    borderRadius:     20,
+    borderWidth:      1,
+    borderColor:      C.olive + '50',
+    paddingHorizontal: 18,
+    paddingVertical:  16,
+    marginBottom:     14,
+  },
+  checkInLeft: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           12,
+    flex:          1,
+  },
+  checkInIcon:  { fontSize: 26 },
+  checkInTitle: { fontSize: 15, fontWeight: '700', color: C.text, marginBottom: 2 },
+  checkInDesc:  { fontSize: 12, color: C.textMuted },
+
   routineCard: {
     backgroundColor:  C.card,
     borderRadius:     26,
@@ -1902,15 +2041,14 @@ const s = StyleSheet.create({
   },
   routineItemInner: {
     flexDirection:  'row',
-    alignItems:     'center',
-    gap:            12,
-    paddingVertical: 11,
+    alignItems:     'flex-start',
+    gap:            10,
+    paddingVertical: 10,
   },
   routineLabel: {
     fontSize:   14,
     color:      C.text,
     lineHeight: 20,
-    flex:       1,
   },
   routineLabelDone: {
     color:          C.textMuted,
@@ -1938,6 +2076,59 @@ const s = StyleSheet.create({
   routineSettingsBtn: { padding: 4 },
 
   // Empty state
+  routineLabelWrap: {
+    flexDirection: 'row',
+    alignItems:    'flex-start',
+    flex:          1,
+    gap:           6,
+  },
+  routineLabelCol: {
+    flex:    1,
+    gap:     4,
+  },
+  // 목표 배지
+  routineGoalBadge: {
+    alignSelf:       'flex-start',
+    backgroundColor: C.oliveFaded,
+    borderWidth:     1,
+    borderColor:     C.olive + '55',
+    borderRadius:    999,
+    paddingHorizontal: 8,
+    paddingVertical:   2,
+  },
+  routineGoalBadgeText: {
+    fontSize:   10,
+    color:      C.olive,
+    fontWeight: '600',
+    letterSpacing: -0.2,
+  },
+  // Empty State
+  routineEmptyDesc: {
+    fontSize:   13,
+    color:      C.textMuted,
+    marginTop:  6,
+    textAlign:  'center',
+    lineHeight: 20,
+  },
+  routineGoalCta: {
+    marginTop:       16,
+    backgroundColor: C.olive,
+    borderRadius:    999,
+    paddingVertical:  13,
+    paddingHorizontal: 20,
+    shadowColor:     C.olive,
+    shadowOpacity:   0.3,
+    shadowRadius:    10,
+    shadowOffset:    { width: 0, height: 5 },
+    elevation:       5,
+  },
+  routineGoalCtaText: {
+    fontSize:   14,
+    fontWeight: '700',
+    color:      C.bg,
+    textAlign:  'center',
+    letterSpacing: -0.2,
+  },
   routineEmptyWrap: {
     paddingVertical: 24,
     alignItems:      'center',

@@ -39,6 +39,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { C, T } from '../styles/theme';
+import { useAuthStore } from '../store/useAuthStore';
+import { pushSideEffectLogs } from '../lib/syncService';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -256,7 +258,8 @@ export default function SideEffectInput({
   onClose,
   onSaved,
 }: SideEffectInputProps) {
-  const db = useSQLiteContext();
+  const db  = useSQLiteContext();
+  const uid = useAuthStore(s => s.session?.user.id ?? null);
 
   // ── 상태 ──────────────────────────────────────────────────────────────────
   // effectId → 선택된 심각도 레벨
@@ -332,6 +335,10 @@ export default function SideEffectInput({
       onSaved();
       handleReset();
       onClose();
+      // 낙관적 업데이트 완료 후 백그라운드 Supabase push
+      if (uid) {
+        pushSideEffectLogs(uid, dateKey, medId, db).catch(() => {});
+      }
     } catch {
       Alert.alert('저장 오류', '기록 중 문제가 발생했습니다. 다시 시도해 주세요.');
     } finally {

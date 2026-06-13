@@ -20,6 +20,11 @@ import { useSQLiteContext } from 'expo-sqlite';
 import * as Notifications from 'expo-notifications';
 import { DB, COLOR_MAP } from '../../src/constants/drugs';
 import type { DrugInfo } from '../../src/constants/drugs';
+import { useAuthStore } from '../../src/store/useAuthStore';
+import {
+  pushMedication,
+  deleteMedicationFromSupabase,
+} from '../../src/lib/syncService';
 import { C as _C } from '../../src/styles/theme';
 import { FadeInView } from '../../src/components/DS';
 import DrugIdentifier from '../../src/components/DrugIdentifier';
@@ -107,7 +112,8 @@ const shortDate = (dateStr: string): string => {
 
 // ─ Component ──────────────────────────────────────────────────────────────────
 export default function MedsScreen() {
-  const db = useSQLiteContext();
+  const db  = useSQLiteContext();
+  const uid = useAuthStore(s => s.session?.user.id ?? null);
 
   const [meds, setMeds] = useState<MedicationLog[]>([]);
   const [seNotes, setSeNotes] = useState<SeNote[]>([]);
@@ -263,14 +269,27 @@ export default function MedsScreen() {
 
     const doSave = async () => {
       await db.runAsync(
-        'INSERT INTO Medications (drugId, dose, doseVal, startDate, stopped) VALUES (?, ?, ?, ?, 0)',
-        [selectedDrug.id, dose, doseVal, startDate]
+        'INSERT INTO Medications (drugId, dose, doseVal, startDate, stopped, item_name) VALUES (?, ?, ?, ?, 0, ?)',
+        [selectedDrug.id, dose, doseVal, startDate, selectedDrug.name]
       );
       console.log('[handleSavePrescription] DB 저장 완료');
       setAddModalVisible(false);
       setSelectedDrug(null);
       setModalStep(1);
       await loadMyMedications();
+      // 낙관적 업데이트 후 백그라운드 push
+      if (uid) {
+        pushMedication(uid, {
+          drugId:     selectedDrug.id,
+          itemName:   selectedDrug.name,
+          entpName:   selectedDrug.brand ?? null,
+          dose,
+          startDate,
+          stopped:    false,
+          stopDate:   null,
+          stopReason: null,
+        }).catch(() => {});
+      }
     };
 
     if (doseVal !== null && selectedDrug.maxDose && doseVal > selectedDrug.maxDose * 2) {
@@ -313,6 +332,20 @@ export default function MedsScreen() {
       }
       setStopModalVisible(false);
       await loadMyMedications();
+      // 백그라운드 push
+      if (uid) {
+        const drug = DB.find(x => x.id === med.drugId);
+        pushMedication(uid, {
+          drugId:     med.drugId,
+          itemName:   drug?.name ?? med.drugId,
+          entpName:   drug?.brand ?? null,
+          dose:       med.dose || null,
+          startDate:  med.startDate,
+          stopped:    true,
+          stopDate,
+          stopReason,
+        }).catch(() => {});
+      }
     } catch (e) {
       console.error('[handleSaveStop] 오류:', e);
       Alert.alert('오류', '중단 처리 중 오류가 발생했어요. 다시 시도해주세요.');
@@ -327,8 +360,13 @@ export default function MedsScreen() {
   const handleConfirmDelete = async (medId: number) => {
     setDeleteConfirmId(null);
     try {
+      const target = meds.find(m => m.id === medId);
       await db.runAsync('DELETE FROM Medications WHERE id = ?', [medId]);
       await loadMyMedications();
+      // 백그라운드 삭제 push
+      if (uid && target) {
+        deleteMedicationFromSupabase(uid, target.drugId).catch(() => {});
+      }
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : String(e);
       Alert.alert('오류', `삭제 중 문제가 발생했어요.\n${errorMsg}`);

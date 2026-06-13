@@ -112,6 +112,54 @@
 //   ALTER TABLE public.mood_logs    ADD COLUMN IF NOT EXISTS tags TEXT;
 //   ALTER TABLE public.mood_logs    ADD COLUMN IF NOT EXISTS memo TEXT;
 // ─────────────────────────────────────────────────────────────────────────────
+//
+//   -- 8. medications  (웹·앱 공유 복용 약물 목록)
+//   CREATE TABLE IF NOT EXISTS public.medications (
+//     id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+//     user_id      UUID        NOT NULL REFERENCES auth.users ON DELETE CASCADE,
+//     item_seq     TEXT        NOT NULL,
+//     item_name    TEXT        NOT NULL,
+//     entp_name    TEXT,
+//     dosage       TEXT,
+//     memo         TEXT,
+//     stopped      BOOLEAN     NOT NULL DEFAULT false,
+//     stop_date    TEXT,
+//     stop_reason  TEXT,
+//     added_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+//     updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+//     UNIQUE (user_id, item_seq)
+//   );
+//   ALTER TABLE public.medications ENABLE ROW LEVEL SECURITY;
+//   CREATE POLICY "users own medications" ON public.medications
+//     USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+//
+//   -- 기존 medications 테이블에 컬럼 추가 (최초 1회):
+//   ALTER TABLE public.medications ADD COLUMN IF NOT EXISTS stopped     BOOLEAN NOT NULL DEFAULT false;
+//   ALTER TABLE public.medications ADD COLUMN IF NOT EXISTS stop_date   TEXT;
+//   ALTER TABLE public.medications ADD COLUMN IF NOT EXISTS stop_reason TEXT;
+//   ALTER TABLE public.medications ADD COLUMN IF NOT EXISTS updated_at  TIMESTAMPTZ NOT NULL DEFAULT now();
+//
+//   -- 9. side_effect_logs  (웹·앱 공유 부작용 기록)
+//   CREATE TABLE IF NOT EXISTS public.side_effect_logs (
+//     id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+//     user_id    UUID        NOT NULL REFERENCES auth.users ON DELETE CASCADE,
+//     item_seq   TEXT        NOT NULL,
+//     item_name  TEXT,
+//     effects    TEXT[]      NOT NULL DEFAULT '{}',
+//     severity   TEXT,
+//     memo       TEXT,
+//     logged_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+//     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+//   );
+//   ALTER TABLE public.side_effect_logs ENABLE ROW LEVEL SECURITY;
+//   CREATE POLICY "users own side_effect_logs" ON public.side_effect_logs
+//     USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+//
+//   -- 기존 side_effect_logs 테이블에 컬럼 추가 (최초 1회):
+//   ALTER TABLE public.side_effect_logs ADD COLUMN IF NOT EXISTS severity   TEXT;
+//   ALTER TABLE public.side_effect_logs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
+//
+// ─────────────────────────────────────────────────────────────────────────────
 
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { supabase } from './supabase';
@@ -141,6 +189,8 @@ export async function pullFromSupabase(db: SQLiteDatabase): Promise<void> {
     _pullBreathingLogs(db, uid),
     _pullUserStats(db, uid),
     _pullSleepSettings(db, uid),
+    _pullMedications(db, uid),
+    _pullSideEffectLogs(db, uid),
   ]);
 }
 
@@ -430,4 +480,311 @@ export async function pushSleepSettings(
       { onConflict: 'user_id' },
     );
   if (error) console.warn('[sync] pushSleepSettings:', error.message);
+}
+
+// ── _pullMedications ─────────────────────────────────────────────────────────
+//
+// Supabase medications → SQLite Medications.
+// item_seq 기준으로 충돌 방지(ON CONFLICT). stopped/stop_date/stop_reason 포함.
+
+async function _pullMedications(db: SQLiteDatabase, uid: string): Promise<void> {
+  const { data, error } = await supabase
+    .from('medications')
+    .select('item_seq, item_name, entp_name, dosage, stopped, stop_date, stop_reason')
+    .eq('user_id', uid)
+    .order('added_at', { ascending: true });
+
+  if (error || !data?.length) return;
+
+  const local = await db.getAllAsync<{ drugId: string }>(
+    'SELECT drugId FROM Medications',
+  );
+  const existingIds = new Set(local.map(r => r.drugId));
+
+  await db.withTransactionAsync(async () => {
+    for (const row of data) {
+      const stopped = row.stopped ? 1 : 0;
+      if (existingIds.has(row.item_seq)) {
+        // 이미 있는 경우 중단 상태만 업데이트 (로컬 용량 정보 보존)
+        await db.runAsync(
+          'UPDATE Medications SET stopped=?, stopDate=?, stopReason=?, item_name=? WHERE drugId=?',
+          [stopped, row.stop_date ?? null, row.stop_reason ?? null, row.item_name, row.item_seq],
+        );
+      } else {
+        // 웹에서 추가된 약물 삽입
+        await db.runAsync(
+          `INSERT INTO Medications (drugId, dose, doseVal, startDate, stopped, stopDate, stopReason, item_name)
+           VALUES (?, ?, NULL, ?, ?, ?, ?, ?)`,
+          [row.item_seq, row.dosage ?? null, new Date().toISOString().slice(0, 10),
+           stopped, row.stop_date ?? null, row.stop_reason ?? null, row.item_name],
+        );
+      }
+    }
+  });
+}
+
+// ── _pullSideEffectLogs ──────────────────────────────────────────────────────
+//
+// Supabase side_effect_logs → SQLite SideEffectLogs.
+// logged_at 날짜 + item_seq 기준으로 중복 방지.
+
+async function _pullSideEffectLogs(db: SQLiteDatabase, uid: string): Promise<void> {
+  const { data, error } = await supabase
+    .from('side_effect_logs')
+    .select('item_seq, item_name, effects, severity, memo, logged_at')
+    .eq('user_id', uid)
+    .order('logged_at', { ascending: true });
+
+  if (error || !data?.length) return;
+
+  await db.withTransactionAsync(async () => {
+    for (const row of data) {
+      const dateKey = (row.logged_at ?? '').slice(0, 10);
+      const existing = await db.getFirstAsync<{ id: number }>(
+        "SELECT id FROM SideEffectLogs WHERE medId=? AND date=? AND se='[supabase]'",
+        [row.item_seq, dateKey],
+      );
+      if (existing) continue;
+
+      const effects: string[] = Array.isArray(row.effects) ? row.effects : [];
+
+      // 각 effect를 별도 행으로 삽입 (앱의 구조와 통일)
+      for (const effect of effects) {
+        await db.runAsync(
+          'INSERT OR IGNORE INTO SideEffectLogs (medId, se, date, memo) VALUES (?, ?, ?, ?)',
+          [row.item_seq, effect, dateKey, row.severity ?? null],
+        );
+      }
+      if (row.memo) {
+        await db.runAsync(
+          "INSERT OR IGNORE INTO SideEffectLogs (medId, se, date, memo) VALUES (?, '메모', ?, ?)",
+          [row.item_seq, dateKey, row.memo],
+        );
+      }
+
+      // 중복 방지용 sentinel 행
+      await db.runAsync(
+        "INSERT OR IGNORE INTO SideEffectLogs (medId, se, date, memo) VALUES (?, '[supabase]', ?, NULL)",
+        [row.item_seq, dateKey],
+      );
+    }
+  });
+}
+
+// ── pushMedication ───────────────────────────────────────────────────────────
+//
+// 단일 Medication 행을 Supabase에 upsert.
+// 앱의 drugId를 item_seq 로, constants/drugs.ts의 name/brand를 item_name/entp_name 으로 매핑.
+// 국가 itemSeq(숫자 문자열)와 앱 ID(영문)가 동일 컬럼에 공존해도 충돌 없음.
+
+export async function pushMedication(
+  uid: string,
+  med: {
+    drugId: string;
+    itemName: string;
+    entpName: string | null;
+    dose: string | null;
+    startDate: string;
+    stopped: boolean;
+    stopDate: string | null;
+    stopReason: string | null;
+  },
+): Promise<void> {
+  const { error } = await supabase
+    .from('medications')
+    .upsert(
+      {
+        user_id:     uid,
+        item_seq:    med.drugId,
+        item_name:   med.itemName,
+        entp_name:   med.entpName,
+        dosage:      med.dose,
+        stopped:     med.stopped,
+        stop_date:   med.stopDate,
+        stop_reason: med.stopReason,
+        updated_at:  new Date().toISOString(),
+      },
+      { onConflict: 'user_id,item_seq' },
+    );
+  if (error) console.warn('[sync] pushMedication:', error.message);
+}
+
+// ── deleteMedicationFromSupabase ─────────────────────────────────────────────
+
+export async function deleteMedicationFromSupabase(
+  uid: string,
+  drugId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('medications')
+    .delete()
+    .eq('user_id', uid)
+    .eq('item_seq', drugId);
+  if (error) console.warn('[sync] deleteMedication:', error.message);
+}
+
+// ── pushSideEffectLogs ───────────────────────────────────────────────────────
+//
+// 앱의 SideEffectLogs(1행/1증상)를 같은 날 + 같은 medId 기준으로 묶어
+// Supabase side_effect_logs 1행으로 insert.
+// medId = Medications.id (SQLite integer) → Medications.drugId (item_seq) 조회 필요.
+
+export async function pushSideEffectLogs(
+  uid: string,
+  dateKey: string,
+  sqliteMedId: string,
+  db: SQLiteDatabase,
+): Promise<void> {
+  // sqliteMedId → drugId 조회
+  const med = await db.getFirstAsync<{ drugId: string; item_name: string | null }>(
+    'SELECT drugId, item_name FROM Medications WHERE id=?',
+    [sqliteMedId],
+  );
+  if (!med) return;
+
+  // 해당 날짜/약의 모든 부작용 행 조회
+  const rows = await db.getAllAsync<{ se: string; memo: string | null }>(
+    "SELECT se, memo FROM SideEffectLogs WHERE medId=? AND date=? AND se != '[supabase]'",
+    [sqliteMedId, dateKey],
+  );
+
+  const effects: string[] = [];
+  const severities: string[] = [];
+  let memoText: string | null = null;
+
+  for (const row of rows) {
+    if (row.se === '메모') {
+      memoText = row.memo;
+    } else {
+      effects.push(row.se);
+      if (row.memo) severities.push(row.memo);
+    }
+  }
+
+  if (!effects.length) return;
+
+  // 가장 높은 심각도 결정 (중증 > 중등도 > 경도)
+  const SEVERITY_ORDER = ['경도', '중등도', '중증'];
+  const topSeverity = severities.reduce<string | null>((top, sv) => {
+    if (!top) return sv;
+    return SEVERITY_ORDER.indexOf(sv) > SEVERITY_ORDER.indexOf(top) ? sv : top;
+  }, null);
+
+  const { error } = await supabase
+    .from('side_effect_logs')
+    .insert({
+      user_id:    uid,
+      item_seq:   med.drugId,
+      item_name:  med.item_name ?? med.drugId,
+      effects,
+      severity:   topSeverity,
+      memo:       memoText,
+      updated_at: new Date().toISOString(),
+    });
+  if (error) console.warn('[sync] pushSideEffectLogs:', error.message);
+}
+
+// ── pushGoalSession ──────────────────────────────────────────────────────────
+//
+// 치료 목표 마법사 완료 시 호출.
+// ① 선택 루틴 → routine_items upsert (label 기준 중복 방지)
+// ② 목표 세션 JSON → test_results (test_type='treatment_goals') insert
+
+export async function pushGoalSession(
+  uid: string,
+  session: {
+    selectedDomains: string[];
+    selectedStates: Record<string, string[]>;
+    selectedGoals: Record<string, string[]>;
+    goalPriority: string[];
+    selectedRoutines: Array<{ text: string; emoji: string }>;
+  },
+): Promise<void> {
+  // ① 기존 routine_items label 목록 조회
+  const { data: existing } = await supabase
+    .from('routine_items')
+    .select('label')
+    .eq('user_id', uid);
+
+  const existingLabels = new Set((existing ?? []).map((r: { label: string }) => r.label));
+  const newRoutines = session.selectedRoutines.filter(r => !existingLabels.has(r.text));
+
+  if (newRoutines.length > 0) {
+    const orderBase = (existing ?? []).length;
+    const rows = newRoutines.map((r, i) => ({
+      user_id:     uid,
+      label:       r.text,
+      emoji:       r.emoji,
+      target_count: 1,
+      order_index: orderBase + i,
+      is_active:   true,
+    }));
+    const { error: rErr } = await supabase.from('routine_items').insert(rows);
+    if (rErr) console.warn('[sync] pushGoalSession routine_items:', rErr.message);
+  }
+
+  // ② 목표 세션 저장
+  const { error } = await supabase.from('test_results').insert({
+    user_id:        uid,
+    test_type:      'treatment_goals',
+    score:          0,
+    result_summary: JSON.stringify({
+      selectedDomains:  session.selectedDomains,
+      selectedStates:   session.selectedStates,
+      selectedGoals:    session.selectedGoals,
+      goalPriority:     session.goalPriority,
+      selectedRoutines: session.selectedRoutines.map(r => r.text),
+    }),
+  });
+  if (error) console.warn('[sync] pushGoalSession test_results:', error.message);
+}
+
+// ── pushGoalCheckIn ──────────────────────────────────────────────────────────
+//
+// 체크인 완료 시 호출. 평균 점수와 평가 배열을 test_results에 저장.
+
+export async function pushGoalCheckIn(
+  uid: string,
+  evaluations: Array<{ goalId: string; score: number }>,
+  date: string,
+): Promise<void> {
+  const avg = evaluations.reduce((s, e) => s + e.score, 0) / evaluations.length;
+
+  const { error } = await supabase.from('test_results').insert({
+    user_id:        uid,
+    test_type:      'goal_checkin',
+    score:          Math.round(avg * 10) / 10,
+    result_summary: JSON.stringify({ evaluations, date }),
+  });
+  if (error) console.warn('[sync] pushGoalCheckIn:', error.message);
+}
+
+// ── fetchLatestGoalSession ────────────────────────────────────────────────────
+//
+// 홈 화면에서 최신 치료 목표 세션을 불러와 체크인 카드 표시 여부 결정.
+
+export async function fetchLatestGoalSession(uid: string): Promise<{
+  selectedDomains: string[];
+  selectedGoals: Record<string, string[]>;
+} | null> {
+  const { data, error } = await supabase
+    .from('test_results')
+    .select('result_summary')
+    .eq('user_id', uid)
+    .eq('test_type', 'treatment_goals')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !data?.result_summary) return null;
+
+  try {
+    const parsed = JSON.parse(data.result_summary);
+    return {
+      selectedDomains: parsed.selectedDomains ?? [],
+      selectedGoals:   parsed.selectedGoals ?? {},
+    };
+  } catch {
+    return null;
+  }
 }
