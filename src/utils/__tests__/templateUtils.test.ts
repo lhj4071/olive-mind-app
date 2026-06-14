@@ -89,4 +89,4 @@ results.forEach(r => {
 });
 console.log(`\n${passed}/${total} passed`);
 
-if (passed < total) process.exit(1);
+if (passed < total) throw new Error(`${total - passed} test(s) failed`);

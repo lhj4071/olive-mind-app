@@ -15,16 +15,17 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { Check, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { Check, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react-native';
 import { C } from '../styles/theme';
 import {
   CONSTRAINTS,
   CURRENT_STATES,
   DOMAIN_LABELS,
   DOMAINS,
-  ROUTINE_MAP,
+  ROUTINES,
   SUBCATEGORIES,
   type Domain,
+  type RoutineItem,
 } from '../constants/goalData';
 import { useGoalStore, getGoalLadder, getRecommendedRoutines } from '../store/useGoalStore';
 import { renderTemplate } from '../utils/templateUtils';
@@ -61,15 +62,22 @@ const LEVEL_LABELS: Record<'small' | 'medium' | 'large', string> = {
 
 // ── Flat routine lookup (step 6 완료 화면에서 사용 — B다음 미션에서 교체 예정) ────
 
-const ALL_ROUTINES_FLAT = Object.values(ROUTINE_MAP).flat();
+const ALL_ROUTINES_FLAT = Object.values(ROUTINES).flat();
 const routineById = (id: string) => ALL_ROUTINES_FLAT.find((r: any) => r.id === id);
+const findRoutineStateId = (routineId: string): string => {
+  for (const [stateId, pool] of Object.entries(ROUTINES)) {
+    if (pool.some(r => r.id === routineId)) return stateId;
+  }
+  return '';
+};
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function GoalSettingScreen() {
   const {
     selectedDomains, selectedStates, selectedGoals, selectedRoutines,
-    toggleDomain, toggleState, toggleGoal, toggleRoutine, resetSession,
+    toggleDomain, toggleState, toggleGoal, patchGoalFilledBlanks,
+    toggleRoutine, patchRoutineFilledBlanks, resetSession,
   } = useGoalStore();
 
   const [currentStep, setCurrentStep]               = useState(1);
@@ -81,6 +89,12 @@ export default function GoalSettingScreen() {
   const [customInputs, setCustomInputs]             = useState<Record<string, string>>({});
   // step 4 빈칸 선택 — goalId → { blankKey → selectedValue }
   const [goalBlanks, setGoalBlanks]                 = useState<Record<string, Record<string, string>>>({});
+  // step 5 루틴 선택
+  const [routineBlanks, setRoutineBlanks]           = useState<Record<string, Record<string, string>>>({});
+  // 스왑 오버라이드: 위치 인덱스 → 현재 표시 중인 routineId
+  const [routineSwaps, setRoutineSwaps]             = useState<Record<number, string>>({});
+  // 풀별 노출 이력: stateId → 지금까지 보여준 routineId 목록
+  const [seenByPool, setSeenByPool]                 = useState<Record<string, string[]>>({});
 
   const fadeAnim  = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -100,6 +114,29 @@ export default function GoalSettingScreen() {
     }
     return result;
   }, [selectedDomains, selectedSubcategories]);
+
+  // ── step 5: 추천 루틴 목록 + 스왑 오버라이드 적용 ────────────────────────────
+
+  const allStateIds = useMemo(
+    () => selectedDomains.flatMap(d => selectedStates[d] ?? []),
+    [selectedDomains, selectedStates],
+  );
+
+  const recommended = useMemo(
+    () => getRecommendedRoutines(allStateIds),
+    [allStateIds],
+  );
+
+  // routineSwaps로 특정 인덱스를 덮어쓴 표시 목록 (no extra state needed)
+  const displayedRoutines = useMemo((): RoutineItem[] => {
+    return recommended.map((r, idx) => {
+      const swappedId = routineSwaps[idx];
+      if (swappedId) {
+        return (ALL_ROUTINES_FLAT.find(rt => rt.id === swappedId) as RoutineItem) ?? r;
+      }
+      return r;
+    });
+  }, [recommended, routineSwaps]);
 
   // ── 애니메이션 ────────────────────────────────────────────────────────────
 
@@ -189,21 +226,16 @@ export default function GoalSettingScreen() {
   const setCustom = (id: string, text: string) =>
     setCustomInputs(prev => ({ ...prev, [id]: text }));
 
-  // handleComplete — selectedRoutines 타입 교체는 다음 미션에서 처리
   const handleComplete = useCallback(async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        const allRoutineObjs = selectedRoutines
-          .map((id: any) => routineById(id))
-          .filter(Boolean) as { id: string; text: string; emoji: string }[];
-
         await pushGoalSession(session.user.id, {
           selectedDomains,
           selectedStates: selectedStates as Record<string, string[]>,
-          selectedGoals:  selectedGoals  as Record<string, string[]>,
+          selectedGoals,
           goalPriority:   [],
-          selectedRoutines: allRoutineObjs.map(r => ({ text: r.text, emoji: r.emoji })),
+          selectedRoutines,
         });
       }
     } catch (e) {
@@ -269,23 +301,25 @@ export default function GoalSettingScreen() {
               </Text>
             </View>
 
-            <View style={s.subcatGrid}>
+            <View style={s.subcatCardGrid}>
               {SUBCATEGORIES[domain].map(sub => {
                 const sel = selSubs.includes(sub.id);
                 return (
                   <TouchableOpacity
                     key={sub.id}
                     style={[
-                      s.subcatChip,
+                      s.subcatCard,
                       sel && { borderColor: meta.color, backgroundColor: `${meta.color}1A` },
                     ]}
                     onPress={() => toggleSubcategory(domain, sub.id)}
                     activeOpacity={0.75}
                   >
                     {sel && (
-                      <View style={[s.subcatCheckDot, { backgroundColor: meta.color }]} />
+                      <View style={[s.checkBadge, { backgroundColor: meta.color }]}>
+                        <Check size={11} color="#fff" strokeWidth={3} />
+                      </View>
                     )}
-                    <Text style={[s.subcatChipText, sel && { color: meta.color, fontWeight: '700' }]}>
+                    <Text style={[s.subcatCardLabel, sel && { color: meta.color, fontWeight: '700' }]}>
                       {sub.label}
                     </Text>
                   </TouchableOpacity>
@@ -307,7 +341,9 @@ export default function GoalSettingScreen() {
 
     const { domain, subcatId, label } = orderedSubcategories[subStepIndex];
     const meta            = DOMAIN_META[domain];
-    const states          = CURRENT_STATES[domain].filter(item => item.subcategory === subcatId);
+    const states          = CURRENT_STATES[domain]
+      .filter(item => item.subcategory === subcatId)
+      .sort((a, b) => (a.is_custom ? 1 : 0) - (b.is_custom ? 1 : 0));
     const selectedStateIds = selectedStates[domain] ?? [];
 
     return (
@@ -388,7 +424,7 @@ export default function GoalSettingScreen() {
             {stateIds.length === 0
               ? <Text style={s.emptyText}>앞 단계에서 현재 상태를 선택해 주세요</Text>
               : stateIds.map(stateId => {
-                  const stateItem = CURRENT_STATES[domain].find(s => s.id === stateId);
+                  const stateItem = CURRENT_STATES[domain].find(cs => cs.id === stateId);
                   if (!stateItem) return null;
 
                   return (
@@ -484,7 +520,13 @@ export default function GoalSettingScreen() {
                                                 backgroundColor: `${meta.color}1A`,
                                               },
                                             ]}
-                                            onPress={() => setGoalBlank(level.id, blankKey, opt)}
+                                            onPress={() => {
+                                              setGoalBlank(level.id, blankKey, opt);
+                                              // 이미 선택된 목표라면 store의 filledBlanks도 갱신
+                                              if (isSelected) {
+                                                patchGoalFilledBlanks(domain, level.id, { [blankKey]: opt });
+                                              }
+                                            }}
                                             activeOpacity={0.75}
                                           >
                                             <Text style={[
@@ -531,50 +573,149 @@ export default function GoalSettingScreen() {
   // ── Step 5: 루틴 선택 (기존 step 4 — 다음 미션에서 새 구조로 교체 예정) ────
 
   const renderStep5 = () => {
-    const allStateIds  = selectedDomains.flatMap(d => selectedStates[d] ?? []);
-    const recommended  = getRecommendedRoutines(allStateIds);
+    const handleSwap = (idx: number, currentId: string, stateId: string, isSelected: boolean) => {
+      const pool = ROUTINES[stateId] ?? [];
+      if (pool.length <= 1) return;
+
+      // 초기 seen: 아직 스왑 이력 없으면 현재 표시 목록에서 해당 풀 소속 ID 수집
+      const alreadySeen = seenByPool[stateId]
+        ?? displayedRoutines.filter(r => findRoutineStateId(r.id) === stateId).map(r => r.id);
+
+      const unseen = pool.filter(r => !alreadySeen.includes(r.id));
+
+      let next: RoutineItem;
+      let newSeen: string[];
+      if (unseen.length > 0) {
+        next    = unseen[0];
+        newSeen = [...alreadySeen, next.id];
+      } else {
+        // 풀 전체 순환 완료 → 처음부터 (현재 것 제외)
+        const others = pool.filter(r => r.id !== currentId);
+        if (others.length === 0) return;
+        next    = others[0];
+        newSeen = [next.id];
+      }
+
+      setSeenByPool(prev => ({ ...prev, [stateId]: newSeen }));
+
+      // 교체되는 루틴이 선택 상태면 해제
+      if (isSelected) {
+        toggleRoutine({ routineId: currentId, stateId, filledBlanks: routineBlanks[currentId] ?? {} });
+      }
+
+      setRoutineSwaps(prev => ({ ...prev, [idx]: next.id }));
+    };
 
     return (
       <View>
         <Text style={s.stepTitle}>매일 어떤 루틴을{'\n'}실천해 볼까요?</Text>
         <Text style={s.stepSub}>
           최대 {CONSTRAINTS.MAX_ROUTINES_TOTAL}개 선택
-          {selectedRoutines.length > 0
-            ? ` · 현재 ${selectedRoutines.length}개 선택됨`
-            : ''}
+          {selectedRoutines.length > 0 ? ` · 현재 ${selectedRoutines.length}개 선택됨` : ''}
         </Text>
 
-        {recommended.length === 0
+        {displayedRoutines.length === 0
           ? <Text style={s.emptyText}>앞 단계에서 현재 상태를 먼저 선택해 주세요</Text>
-          : recommended.map(routine => {
-              const sel   = selectedRoutines.some((e: any) =>
-                typeof e === 'string' ? e === routine.id : e.routineId === routine.id
+          : displayedRoutines.map((routine, idx) => {
+              const stateId      = findRoutineStateId(routine.id);
+              const currentBlanks = routineBlanks[routine.id] ?? {};
+              const { text: previewText, blankKeys } = renderTemplate(
+                routine.template,
+                routine.blanks,
+                currentBlanks,
               );
+              const sel   = selectedRoutines.some(e => e.routineId === routine.id);
               const maxed = !sel && selectedRoutines.length >= CONSTRAINTS.MAX_ROUTINES_TOTAL;
 
+              const handleSelect = () => {
+                if (maxed) return;
+                toggleRoutine({ routineId: routine.id, stateId, filledBlanks: currentBlanks });
+              };
+
               return (
-                <TouchableOpacity
-                  key={routine.id}
+                <View
+                  key={`${idx}-${routine.id}`}
                   style={[
                     s.routineCard,
-                    sel && s.routineCardSel,
+                    sel   && s.routineCardSel,
                     maxed && s.selectCardDimmed,
                   ]}
-                  onPress={() => {
-                    if (!maxed) (toggleRoutine as any)({ routineId: routine.id, stateId: '', filledBlanks: {} });
-                  }}
-                  activeOpacity={0.75}
                 >
-                  <Text style={s.routineEmoji}>{routine.emoji}</Text>
-                  <Text style={[s.routineText, sel && { color: C.text }]}>
-                    {routine.template}
-                  </Text>
-                  {sel && (
-                    <View style={s.routineCheckWrap}>
-                      <Check size={14} color={C.olive} strokeWidth={2.5} />
-                    </View>
-                  )}
-                </TouchableOpacity>
+                  {/* 헤더: 이모지 + 완성 문장 + 스왑 버튼 + 체크 버튼 */}
+                  <View style={s.routineCardHeader}>
+                    <Text style={s.routineEmoji}>{routine.emoji ?? '🌿'}</Text>
+                    <TouchableOpacity
+                      style={{ flex: 1 }}
+                      onPress={handleSelect}
+                      disabled={maxed}
+                      activeOpacity={maxed ? 1 : 0.7}
+                    >
+                      <Text style={[s.routineText, sel && { color: C.text, fontWeight: '600' }]}>
+                        {previewText}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => handleSwap(idx, routine.id, stateId, sel)}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      activeOpacity={0.6}
+                    >
+                      <RefreshCw size={15} color={C.dim} strokeWidth={2} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={handleSelect}
+                      disabled={maxed}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                      <View style={[s.checkCircle, sel && s.checkCircleSel, s.goalCheckCircle]}>
+                        {sel && <Check size={10} color="#fff" strokeWidth={3} />}
+                      </View>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* 빈칸 선택 칩 (매드립) */}
+                  {blankKeys.map(blankKey => {
+                    const options = routine.blanks[blankKey] ?? [];
+                    const selVal  = currentBlanks[blankKey] ?? options[0];
+                    return (
+                      <View key={blankKey} style={s.blankRow}>
+                        <Text style={s.blankLabel}>{blankKey}</Text>
+                        <ScrollView
+                          horizontal
+                          showsHorizontalScrollIndicator={false}
+                          contentContainerStyle={s.blankChipScrollContent}
+                        >
+                          {options.map(opt => {
+                            const chipSel = selVal === opt;
+                            return (
+                              <TouchableOpacity
+                                key={opt}
+                                style={[
+                                  s.blankChip,
+                                  chipSel && { borderColor: C.olive, backgroundColor: C.oliveFaded },
+                                ]}
+                                onPress={() => {
+                                  setRoutineBlanks(prev => ({
+                                    ...prev,
+                                    [routine.id]: { ...(prev[routine.id] ?? {}), [blankKey]: opt },
+                                  }));
+                                  if (sel) patchRoutineFilledBlanks(routine.id, { [blankKey]: opt });
+                                }}
+                                activeOpacity={0.75}
+                              >
+                                <Text style={[
+                                  s.blankChipText,
+                                  chipSel && { color: C.olive, fontWeight: '700' },
+                                ]}>
+                                  {opt}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </ScrollView>
+                      </View>
+                    );
+                  })}
+                </View>
               );
             })
         }
@@ -771,16 +912,20 @@ const s = StyleSheet.create({
   countBadge:         { marginLeft: 'auto', backgroundColor: C.card, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 99 },
   countBadgeText:     { fontSize: 11, fontWeight: '600', color: C.textMuted },
 
-  // Step 2: Subcategory chips
-  subcatGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  subcatChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 14, paddingVertical: 10,
-    backgroundColor: C.card, borderRadius: 99,
-    borderWidth: 1.5, borderColor: C.border,
+  // Step 2: Subcategory card grid
+  subcatCardGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  subcatCard: {
+    width: '48.5%',
+    backgroundColor: C.card,
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1.5,
+    borderColor: C.border,
+    position: 'relative',
+    minHeight: 60,
+    justifyContent: 'center',
   },
-  subcatCheckDot: { width: 7, height: 7, borderRadius: 4 },
-  subcatChipText: { fontSize: 14, fontWeight: '500', color: C.textMuted },
+  subcatCardLabel: { fontSize: 14, fontWeight: '600', color: C.textMuted },
 
   // Step 3: Subcategory context header
   subcatHeader: {
@@ -855,9 +1000,11 @@ const s = StyleSheet.create({
 
   // Routine cards
   routineCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: C.card, borderRadius: 12, padding: 14,
     marginBottom: 7, borderWidth: 1.5, borderColor: C.border,
+  },
+  routineCardHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
   },
   routineCardSel:   { borderColor: C.olive, backgroundColor: C.oliveFaded },
   routineEmoji:     { fontSize: 22, flexShrink: 0 },

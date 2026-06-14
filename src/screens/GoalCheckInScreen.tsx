@@ -13,9 +13,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { C } from '../styles/theme';
-import { GOALS, type Domain } from '../constants/goalData';
+import { type Domain } from '../constants/goalData';
 import { supabase } from '../lib/supabase';
 import { fetchLatestGoalSession, pushGoalCheckIn } from '../lib/syncService';
+import { getGoalLadder, type SelectedGoalEntry } from '../store/useGoalStore';
+import { renderTemplate } from '../utils/templateUtils';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -75,11 +77,13 @@ export default function GoalCheckInScreen() {
 
       const items: GoalItem[] = [];
       for (const domain of goalSession.selectedDomains as Domain[]) {
-        for (const goalId of goalSession.selectedGoals[domain] ?? []) {
-          const goalObj = GOALS[domain]?.find(g => g.id === goalId);
-          if (goalObj && !goalObj.is_custom) {
-            items.push({ domain, goalId, text: goalObj.text });
-          }
+        const entries: SelectedGoalEntry[] = goalSession.selectedGoals[domain] ?? [];
+        for (const entry of entries) {
+          const ladder   = getGoalLadder(entry.stateId);
+          const levelObj = ladder.find(l => l.id === entry.goalId);
+          if (!levelObj) continue;
+          const { text } = renderTemplate(levelObj.template, levelObj.blanks, entry.filledBlanks);
+          items.push({ domain, goalId: entry.goalId, text });
         }
       }
 

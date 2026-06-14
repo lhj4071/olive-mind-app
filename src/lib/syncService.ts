@@ -163,6 +163,9 @@
 
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { supabase } from './supabase';
+import { ROUTINES } from '../constants/goalData';
+import { renderTemplate } from '../utils/templateUtils';
+import type { SelectedGoalEntry, SelectedRoutineEntry } from '../store/useGoalStore';
 
 // ── 내부 헬퍼 ─────────────────────────────────────────────────────────────────
 
@@ -687,17 +690,18 @@ export async function pushSideEffectLogs(
 // ── pushGoalSession ──────────────────────────────────────────────────────────
 //
 // 치료 목표 마법사 완료 시 호출.
-// ① 선택 루틴 → routine_items upsert (label 기준 중복 방지)
+// ① 선택 루틴 → routine_items upsert (완성 문장 label 기준 중복 방지)
 // ② 목표 세션 JSON → test_results (test_type='treatment_goals') insert
+//    result_summary에는 template id + filledBlanks만 저장 (완성 문장 X)
 
 export async function pushGoalSession(
   uid: string,
   session: {
     selectedDomains: string[];
     selectedStates: Record<string, string[]>;
-    selectedGoals: Record<string, string[]>;
+    selectedGoals: Partial<Record<string, SelectedGoalEntry[]>>;
     goalPriority: string[];
-    selectedRoutines: Array<{ text: string; emoji: string }>;
+    selectedRoutines: SelectedRoutineEntry[];
   },
 ): Promise<void> {
   // ① 기존 routine_items label 목록 조회
@@ -707,23 +711,38 @@ export async function pushGoalSession(
     .eq('user_id', uid);
 
   const existingLabels = new Set((existing ?? []).map((r: { label: string }) => r.label));
-  const newRoutines = session.selectedRoutines.filter(r => !existingLabels.has(r.text));
+  let orderBase = (existing ?? []).length;
 
-  if (newRoutines.length > 0) {
-    const orderBase = (existing ?? []).length;
-    const rows = newRoutines.map((r, i) => ({
-      user_id:     uid,
-      label:       r.text,
-      emoji:       r.emoji,
+  const newRows: Array<{
+    user_id: string; label: string; emoji: string | null;
+    target_count: number; order_index: number; is_active: boolean;
+  }> = [];
+
+  for (const entry of session.selectedRoutines) {
+    const pool   = ROUTINES[entry.stateId] ?? [];
+    const item   = pool.find(r => r.id === entry.routineId);
+    if (!item) continue;
+
+    const { text: label } = renderTemplate(item.template, item.blanks, entry.filledBlanks);
+    if (existingLabels.has(label)) continue;
+
+    newRows.push({
+      user_id:      uid,
+      label,
+      emoji:        item.emoji ?? null,
       target_count: 1,
-      order_index: orderBase + i,
-      is_active:   true,
-    }));
-    const { error: rErr } = await supabase.from('routine_items').insert(rows);
+      order_index:  orderBase++,
+      is_active:    true,
+    });
+    existingLabels.add(label); // 동일 세션 내 중복 방지
+  }
+
+  if (newRows.length > 0) {
+    const { error: rErr } = await supabase.from('routine_items').insert(newRows);
     if (rErr) console.warn('[sync] pushGoalSession routine_items:', rErr.message);
   }
 
-  // ② 목표 세션 저장
+  // ② 목표 세션 저장 (template id + filledBlanks만 저장)
   const { error } = await supabase.from('test_results').insert({
     user_id:        uid,
     test_type:      'treatment_goals',
@@ -733,7 +752,7 @@ export async function pushGoalSession(
       selectedStates:   session.selectedStates,
       selectedGoals:    session.selectedGoals,
       goalPriority:     session.goalPriority,
-      selectedRoutines: session.selectedRoutines.map(r => r.text),
+      selectedRoutines: session.selectedRoutines,
     }),
   });
   if (error) console.warn('[sync] pushGoalSession test_results:', error.message);
@@ -761,11 +780,12 @@ export async function pushGoalCheckIn(
 
 // ── fetchLatestGoalSession ────────────────────────────────────────────────────
 //
-// 홈 화면에서 최신 치료 목표 세션을 불러와 체크인 카드 표시 여부 결정.
+// 홈 화면·체크인 화면에서 최신 치료 목표 세션을 불러온다.
+// 구형 포맷(selectedGoals 값이 string[] 배열)이면 null 반환 — 데이터 손실 허용(베타).
 
 export async function fetchLatestGoalSession(uid: string): Promise<{
   selectedDomains: string[];
-  selectedGoals: Record<string, string[]>;
+  selectedGoals: Record<string, SelectedGoalEntry[]>;
 } | null> {
   const { data, error } = await supabase
     .from('test_results')
@@ -780,9 +800,17 @@ export async function fetchLatestGoalSession(uid: string): Promise<{
 
   try {
     const parsed = JSON.parse(data.result_summary);
+    const goals: Record<string, unknown[]> = parsed.selectedGoals ?? {};
+
+    // 구형 포맷 감지: 도메인별 값이 string[] (goalId 문자열 배열)이면 구형
+    const firstEntries = Object.values(goals)[0];
+    if (Array.isArray(firstEntries) && firstEntries.length > 0 && typeof firstEntries[0] === 'string') {
+      return null;
+    }
+
     return {
       selectedDomains: parsed.selectedDomains ?? [],
-      selectedGoals:   parsed.selectedGoals ?? {},
+      selectedGoals:   goals as Record<string, SelectedGoalEntry[]>,
     };
   } catch {
     return null;

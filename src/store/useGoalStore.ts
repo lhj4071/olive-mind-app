@@ -58,7 +58,9 @@ export interface GoalActions {
   toggleState:     (domain: Domain, stateId: string) => void;
 
   // 목표 (영역당 최대 3개 — 동일 goalId 재호출 시 제거)
-  toggleGoal:      (domain: Domain, entry: SelectedGoalEntry) => void;
+  toggleGoal:           (domain: Domain, entry: SelectedGoalEntry) => void;
+  // 이미 선택된 목표의 filledBlanks만 부분 업데이트 (토글 없이)
+  patchGoalFilledBlanks:(domain: Domain, goalId: string, patch: Record<string, string>) => void;
 
   // 목표 우선순위 (goalId 배열 교체)
   setGoalPriority: (orderedGoalIds: string[]) => void;
@@ -66,6 +68,8 @@ export interface GoalActions {
   // 루틴 (전체 최대 5개 — 동일 routineId 재호출 시 제거)
   toggleRoutine:   (entry: SelectedRoutineEntry) => void;
   setRoutines:     (entries: SelectedRoutineEntry[]) => void;
+  // 이미 선택된 루틴의 filledBlanks만 부분 업데이트 (토글 없이)
+  patchRoutineFilledBlanks: (routineId: string, patch: Record<string, string>) => void;
 
   // 체크인 기록 추가
   addCheckIn:      (record: CheckInRecord) => void;
@@ -177,6 +181,15 @@ export const useGoalStore = create<GoalStore>((set) => ({
     };
   }),
 
+  patchGoalFilledBlanks: (domain, goalId, patch) => set(state => {
+    const current = state.selectedGoals[domain] ?? [];
+    const idx = current.findIndex(e => e.goalId === goalId);
+    if (idx < 0) return state;
+    const updated = current.slice();
+    updated[idx] = { ...updated[idx], filledBlanks: { ...updated[idx].filledBlanks, ...patch } };
+    return { selectedGoals: { ...state.selectedGoals, [domain]: updated } };
+  }),
+
   // ── 목표 우선순위 ─────────────────────────────────────────────────────────────
 
   setGoalPriority: (orderedGoalIds) => set({ goalPriority: orderedGoalIds }),
@@ -195,6 +208,14 @@ export const useGoalStore = create<GoalStore>((set) => ({
 
   setRoutines: (entries) => set({
     selectedRoutines: entries.slice(0, CONSTRAINTS.MAX_ROUTINES_TOTAL),
+  }),
+
+  patchRoutineFilledBlanks: (routineId, patch) => set(state => {
+    const idx = state.selectedRoutines.findIndex(e => e.routineId === routineId);
+    if (idx < 0) return state;
+    const updated = state.selectedRoutines.slice();
+    updated[idx] = { ...updated[idx], filledBlanks: { ...updated[idx].filledBlanks, ...patch } };
+    return { selectedRoutines: updated };
   }),
 
   // ── 체크인 ──────────────────────────────────────────────────────────────────
