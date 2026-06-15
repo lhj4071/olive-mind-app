@@ -727,8 +727,13 @@ export default function GoalSettingScreen() {
 
   const renderStep6 = () => {
     const selected = selectedRoutines
-      .map((e: any) => routineById(typeof e === 'string' ? e : e.routineId))
-      .filter(Boolean);
+      .map(e => {
+        const item = routineById(e.routineId);
+        if (!item) return null;
+        const { text } = renderTemplate(item.template, item.blanks, e.filledBlanks);
+        return { id: item.id, emoji: item.emoji, text };
+      })
+      .filter(Boolean) as Array<{ id: string; emoji?: string; text: string }>;
 
     return (
       <View style={s.completeWrap}>
@@ -736,9 +741,9 @@ export default function GoalSettingScreen() {
         <Text style={s.completeSub}>선택한 루틴들을 매일 조금씩 실천해 보세요</Text>
 
         <View style={s.completeList}>
-          {(selected as any[]).map((r: any) => r && (
+          {selected.map(r => (
             <View key={r.id} style={s.completedCard}>
-              <Text style={s.routineEmoji}>{r.emoji}</Text>
+              <Text style={s.routineEmoji}>{r.emoji ?? '🌿'}</Text>
               <Text style={s.completedCardText}>{r.text}</Text>
               <View style={[s.routineCheckWrap, { backgroundColor: `${C.olive}30` }]}>
                 <Check size={14} color={C.olive} strokeWidth={2.5} />

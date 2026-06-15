@@ -1,20 +1,9 @@
 // src/utils/__tests__/templateUtils.test.ts
-// renderTemplate 단위 테스트 (독립형 — Jest 없이 `npx ts-node` 로 실행 가능)
-// Jest를 추가할 경우: npm i -D jest @types/jest ts-jest 후 이 파일을 Jest 형식으로 전환 가능.
+// renderTemplate 단위 테스트 — Jest 및 ts-node 양쪽으로 실행 가능.
+// ts-node: npx ts-node --compiler-options '{"module":"commonjs","esModuleInterop":true}' src/utils/__tests__/templateUtils.test.ts
+// Jest:    npx jest
 
 import { renderTemplate } from '../templateUtils';
-
-type TestResult = { name: string; passed: boolean; error?: string };
-const results: TestResult[] = [];
-
-function test(name: string, fn: () => void) {
-  try {
-    fn();
-    results.push({ name, passed: true });
-  } catch (e) {
-    results.push({ name, passed: false, error: String(e) });
-  }
-}
 
 function assertEqual<T>(actual: T, expected: T) {
   const a = JSON.stringify(actual);
@@ -78,15 +67,3 @@ test('selectedValues 없음 — blanks 첫 값 전부 기본값', () => {
   assertEqual(r.text, '하루에 한 번에 가족에게 짧게 인사하기');
   assertEqual(r.blankKeys, ['시점']);
 });
-
-// ── 결과 출력 ─────────────────────────────────────────────────────────────────
-const passed = results.filter(r => r.passed).length;
-const total  = results.length;
-
-results.forEach(r => {
-  const icon = r.passed ? '✓' : '✗';
-  console.log(`  ${icon} ${r.name}${r.error ? `\n      → ${r.error}` : ''}`);
-});
-console.log(`\n${passed}/${total} passed`);
-
-if (passed < total) throw new Error(`${total - passed} test(s) failed`);
