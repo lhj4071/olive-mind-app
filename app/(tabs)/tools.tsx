@@ -18,6 +18,8 @@ import {
   X,
 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import RelaxationAudioModal, { type RelaxationTool } from '../../src/components/RelaxationAudioModal';
+import { supabase } from '../../src/lib/supabase';
 import {
   Alert,
   Dimensions,
@@ -131,21 +133,28 @@ const DASHBOARD_TOOLS: DashTool[] = [
 
 // ── Dashboard Card Styles (선언을 ToolCard보다 앞에 두어야 참조 가능) ──────────
 const dc = StyleSheet.create({
-  scrollContent: { paddingHorizontal: 16, paddingTop: 28 },
-  pageHeader:    { marginBottom: 28, paddingHorizontal: 4 },
-  pageTitle:     { fontSize: 22, fontWeight: '700', color: C.text, letterSpacing: -0.4, marginBottom: 6 },
-  pageSub:       { fontSize: 14, color: C.textMuted, lineHeight: 22 },
-  grid:          { flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginBottom: 32 },
-  cardOuter:     { width: CARD_SIZE },
-  card:          { width: CARD_SIZE, height: CARD_H, borderRadius: 22, borderWidth: 1, padding: 18, overflow: 'hidden' },
-  iconRing:      { width: 52, height: 52, borderRadius: 26, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
-  cardTitle:     { fontSize: 15, fontWeight: '600', color: C.text, marginBottom: 6, letterSpacing: -0.2 },
-  cardTagline:   { fontSize: 12, color: C.textMuted, lineHeight: 19 },
-  cardFooter:    { borderTopWidth: 1, paddingTop: 10 },
-  cardDesc:      { fontSize: 11, fontWeight: '500', letterSpacing: 0.2 },
-  sosRow:        { alignItems: 'center', marginBottom: 8 },
-  sosBtn:        { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: C.dangerDark, borderWidth: 1, borderColor: C.dangerBorder, paddingHorizontal: 24, paddingVertical: 14, borderRadius: 100 },
-  sosBtnText:    { fontSize: 14, fontWeight: '500', color: C.danger },
+  scrollContent:   { paddingHorizontal: 16, paddingTop: 28 },
+  pageHeader:      { marginBottom: 28, paddingHorizontal: 4 },
+  pageTitle:       { fontSize: 22, fontWeight: '700', color: C.text, letterSpacing: -0.4, marginBottom: 6 },
+  pageSub:         { fontSize: 14, color: C.textMuted, lineHeight: 22 },
+  grid:            { flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginBottom: 32 },
+  cardOuter:       { width: CARD_SIZE },
+  card:            { width: CARD_SIZE, height: CARD_H, borderRadius: 22, borderWidth: 1, padding: 18, overflow: 'hidden' },
+  iconRing:        { width: 52, height: 52, borderRadius: 26, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
+  cardTitle:       { fontSize: 15, fontWeight: '600', color: C.text, marginBottom: 6, letterSpacing: -0.2 },
+  cardTagline:     { fontSize: 12, color: C.textMuted, lineHeight: 19 },
+  cardFooter:      { borderTopWidth: 1, paddingTop: 10 },
+  cardDesc:        { fontSize: 11, fontWeight: '500', letterSpacing: 0.2 },
+  sosRow:          { alignItems: 'center', marginBottom: 8 },
+  sosBtn:          { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: C.dangerDark, borderWidth: 1, borderColor: C.dangerBorder, paddingHorizontal: 24, paddingVertical: 14, borderRadius: 100 },
+  sosBtnText:      { fontSize: 14, fontWeight: '500', color: C.danger },
+  // ── 이완 도구함 섹션 ───────────────────────────────────────────────────────
+  sectionBlock:    { marginBottom: 24 },
+  sectionHeader:   { paddingHorizontal: 4, marginBottom: 16 },
+  sectionTitle:    { fontSize: 16, fontWeight: '600', color: C.text, letterSpacing: -0.2, marginBottom: 4 },
+  sectionSub:      { fontSize: 13, color: C.textMuted },
+  relaxIconCircle: { width: 52, height: 52, borderRadius: 26, backgroundColor: '#152018', borderWidth: 1, borderColor: '#2A4030', alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
+  relaxEmoji:      { fontSize: 26 },
 });
 
 // ── Tool Card ─────────────────────────────────────────────────────────────────
@@ -192,11 +201,66 @@ function ToolCard({
   );
 }
 
+// ── Relax Tool Card ───────────────────────────────────────────────────────────
+function RelaxToolCard({
+  tool,
+  index,
+  onPress,
+}: {
+  tool:    RelaxationTool;
+  index:   number;
+  onPress: () => void;
+}) {
+  const scale    = useSharedValue(1);
+  const cardAnim = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+
+  return (
+    <Animated.View
+      entering={FadeInDown.delay(index * 80).springify().damping(18).stiffness(120)}
+      style={[dc.cardOuter, cardAnim]}
+    >
+      <TouchableOpacity
+        style={[dc.card, { backgroundColor: '#0C1C18', borderColor: '#1A3028' }]}
+        activeOpacity={1}
+        onPressIn={() => { scale.value = withSpring(0.95, { damping: 20, stiffness: 350 }); }}
+        onPressOut={() => { scale.value = withSpring(1,    { damping: 20, stiffness: 350 }); }}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          onPress();
+        }}
+      >
+        <View style={dc.relaxIconCircle}>
+          <Text style={dc.relaxEmoji}>{tool.icon}</Text>
+        </View>
+        <Text style={dc.cardTitle}>{tool.title}</Text>
+        <Text style={dc.cardTagline}>{tool.category}</Text>
+        <View style={{ flex: 1 }} />
+        <View style={[dc.cardFooter, { borderTopColor: '#1A3028' }]}>
+          <Text style={[dc.cardDesc, { color: C.olive }]}>{tool.duration_min}분 가이드</Text>
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function ToolsScreen() {
   const insets = useSafeAreaInsets();
 
   const [activeScreen, setActiveScreen] = useState<ActiveScreen>('dashboard');
+
+  // ── 이완 도구함 state ────────────────────────────────────────────────────────
+  const [relaxTools,        setRelaxTools]        = useState<RelaxationTool[]>([]);
+  const [selectedRelaxTool, setSelectedRelaxTool] = useState<RelaxationTool | null>(null);
+  const [audioVisible,      setAudioVisible]      = useState(false);
+
+  useEffect(() => {
+    supabase
+      .from('relaxation_tools')
+      .select('*')
+      .order('order', { ascending: true })
+      .then(({ data }) => { if (data) setRelaxTools(data as RelaxationTool[]); });
+  }, []);
 
   // ── 복식 호흡 — 에포크 기반 타이머 훅 ───────────────────────────────────────
   const videoRef = useRef<Video>(null);
@@ -417,6 +481,28 @@ export default function ToolsScreen() {
           />
         ))}
       </View>
+
+      {relaxTools.length > 0 && (
+        <Animated.View
+          entering={FadeInDown.delay(DASHBOARD_TOOLS.length * 90 + 20).springify().damping(18)}
+          style={dc.sectionBlock}
+        >
+          <View style={dc.sectionHeader}>
+            <Text style={dc.sectionTitle}>이완 도구함</Text>
+            <Text style={dc.sectionSub}>가이드 오디오로 명상하기</Text>
+          </View>
+          <View style={dc.grid}>
+            {relaxTools.map((tool, idx) => (
+              <RelaxToolCard
+                key={tool.id}
+                tool={tool}
+                index={idx}
+                onPress={() => { setSelectedRelaxTool(tool); setAudioVisible(true); }}
+              />
+            ))}
+          </View>
+        </Animated.View>
+      )}
 
       <Animated.View
         entering={FadeInDown.delay(DASHBOARD_TOOLS.length * 90 + 80).springify().damping(18)}
@@ -724,6 +810,11 @@ export default function ToolsScreen() {
   return (
     <View style={s.container}>
       {renderBreathingModal()}
+      <RelaxationAudioModal
+        tool={selectedRelaxTool}
+        visible={audioVisible}
+        onClose={() => setAudioVisible(false)}
+      />
       <View style={s.header}>
         <Text style={s.headerTitle}>도구함</Text>
         {activeScreen === 'dashboard' && (
