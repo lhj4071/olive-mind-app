@@ -176,10 +176,10 @@ interface GreetingInfo { text: string; emoji: string; calmBg: string; }
 
 const getGreeting = (): GreetingInfo => {
   const h = new Date().getHours();
-  if (h >= 5  && h < 12) return { text: '좋은 아침이에요',   emoji: '🌅', calmBg: '#3A5030' };
-  if (h >= 12 && h < 17) return { text: '좋은 오후예요',     emoji: '☀️', calmBg: '#465A34' };
-  if (h >= 17 && h < 21) return { text: '평온한 저녁이에요', emoji: '🌆', calmBg: '#304428' };
-  return                         { text: '편안한 밤 되세요',  emoji: '🌙', calmBg: '#22301C' };
+  if (h >= 5  && h < 12) return { text: '좋은 아침이에요',   emoji: '🌅', calmBg: '#B87040' };
+  if (h >= 12 && h < 17) return { text: '좋은 오후예요',     emoji: '☀️', calmBg: '#5E7A48' };
+  if (h >= 17 && h < 21) return { text: '평온한 저녁이에요', emoji: '🌆', calmBg: '#7A5840' };
+  return                         { text: '편안한 밤 되세요',  emoji: '🌙', calmBg: '#4A3C2C' };
 };
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
@@ -214,10 +214,10 @@ interface SliderProps   { value: number; color: string; onCommit: (v: number) =>
 const DEFAULT_SLIDERS: SliderValues = { mood: 5, anxiety: 5, irritability: 5, sleep: 5 };
 
 const SLIDER_DEFS: SliderDef[] = [
-  { key: 'mood',         label: '기분',   emoji: '😊', lowText: '매우 나쁨', highText: '매우 좋음', color: '#7C8C5E' },
-  { key: 'anxiety',      label: '불안',   emoji: '😰', lowText: '전혀 없음', highText: '매우 심함', color: '#C4956A' },
+  { key: 'mood',         label: '기분',   emoji: '😊', lowText: '매우 나쁨', highText: '매우 좋음', color: C.olive },
+  { key: 'anxiety',      label: '불안',   emoji: '😰', lowText: '전혀 없음', highText: '매우 심함', color: C.gad7  },
   { key: 'irritability', label: '예민도', emoji: '😤', lowText: '전혀 없음', highText: '매우 심함', color: '#A08260' },
-  { key: 'sleep',        label: '수면',   emoji: '😴', lowText: '매우 나쁨', highText: '매우 좋음', color: '#6A8CA0' },
+  { key: 'sleep',        label: '수면',   emoji: '😴', lowText: '매우 나쁨', highText: '매우 좋음', color: C.phq9  },
 ];
 
 const EMOTION_TAGS = [
@@ -373,7 +373,7 @@ const sl = StyleSheet.create({
   wrapper:   { width: TRACK_W, height: THUMB_D + 4, justifyContent: 'center' },
   trackBg:   { position: 'absolute', left: THUMB_R, right: THUMB_R, height: 6, borderRadius: 3, backgroundColor: C.border },
   trackFill: { position: 'absolute', left: THUMB_R, height: 6, borderRadius: 3 },
-  thumb:     { position: 'absolute', width: THUMB_D, height: THUMB_D, borderRadius: THUMB_R, backgroundColor: C.white, borderWidth: 2.5, alignItems: 'center', justifyContent: 'center', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 4 },
+  thumb:     { position: 'absolute', width: THUMB_D, height: THUMB_D, borderRadius: THUMB_R, backgroundColor: C.white, borderWidth: 3, alignItems: 'center', justifyContent: 'center', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.36, shadowRadius: 10, elevation: 8 },
   thumbLabel: {
     fontSize:           11,
     fontWeight:         '700',
@@ -1006,7 +1006,9 @@ export default function HomeScreen() {
     const message       = TREE_MESSAGES[treeLevel] ?? '';
 
     return (
+      <View style={[s.calmZoneShadow, { shadowColor: greeting.calmBg }]}>
       <View style={[s.calmZone, { backgroundColor: greeting.calmBg }]}>
+        <View style={s.calmHighlight} pointerEvents="none" />
         <View style={s.calmRow}>
           {/* ── 좌측: 인사말 ── */}
           <View style={s.calmLeft}>
@@ -1018,14 +1020,9 @@ export default function HomeScreen() {
             </Text>
           </View>
 
-          {/* ── 우측: 올리브 나무 ── */}
+          {/* ── 우측: 올리브 나무 (가로 배치) ── */}
           <View style={s.calmRight}>
-            {/* 수확 인벤토리 배지 */}
-            <View style={s.careBadge}>
-              <Text style={s.careBadgeText}>🫒 수확한 올리브: {harvestedCount}개</Text>
-            </View>
-
-            {/* 나무 이미지 (수확 가능 시 터치 가능) */}
+            {/* 나무 이미지 */}
             <TouchableOpacity
               onPress={isHarvestable ? handleHarvest : undefined}
               activeOpacity={isHarvestable ? 0.75 : 1}
@@ -1044,16 +1041,22 @@ export default function HomeScreen() {
               </Animated.View>
             </TouchableOpacity>
 
-            {/* 단계 메시지 */}
-            <Text style={[
-              s.treeMessage,
-              isHarvestable && s.treeMessageHarvest,
-              isWithered     && s.treeMessageWithered,
-            ]}>
-              {message}
-            </Text>
+            {/* 배지 + 메시지 (나무 오른쪽에 세로로) */}
+            <View style={s.calmTreeInfo}>
+              <View style={s.careBadge}>
+                <Text style={s.careBadgeText}>🫒 {harvestedCount}개</Text>
+              </View>
+              <Text style={[
+                s.treeMessage,
+                isHarvestable && s.treeMessageHarvest,
+                isWithered     && s.treeMessageWithered,
+              ]}>
+                {message}
+              </Text>
+            </View>
           </View>
         </View>
+      </View>
       </View>
     );
   };
@@ -1108,15 +1111,19 @@ export default function HomeScreen() {
 
     return (
       <>
-        <View style={s.sectionHeadingRow}>
-          <Text style={s.sectionHeading}>오늘의 미니 루틴</Text>
-          <TouchableOpacity onPress={() => setRoutineEditModal(true)} style={s.routineSettingsBtn} activeOpacity={0.7}>
-            <Settings size={18} color={C.textMuted} />
-          </TouchableOpacity>
-        </View>
-        <Text style={s.sectionSub}>작은 행동 하나가 회복의 시작입니다.</Text>
-
         <View style={s.routineCard}>
+          <View style={s.sectionHeadingRow}>
+            <Text style={s.sectionHeading}>오늘의 미니 루틴</Text>
+            <View style={s.routineHeaderBtns}>
+              <TouchableOpacity onPress={() => router.push('/goal-setting' as any)} style={s.routineGoalBtn} activeOpacity={0.7}>
+                <Text style={s.routineGoalBtnText}>🎯 목표 설정</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setRoutineEditModal(true)} style={s.routineSettingsBtn} activeOpacity={0.7}>
+                <Settings size={18} color={C.textMuted} />
+              </TouchableOpacity>
+            </View>
+          </View>
+          <Text style={s.sectionSub}>작은 행동 하나가 회복의 시작입니다.</Text>
           {total === 0 ? (
             <View style={s.routineEmptyWrap}>
               <Text style={s.routineEmptyText}>아직 설정된 루틴이 없어요</Text>
@@ -1366,9 +1373,9 @@ export default function HomeScreen() {
         withInnerLines
         withOuterLines={false}
         chartConfig={{
-          backgroundColor:        '#2C3A28',
-          backgroundGradientFrom: '#2C3A28',
-          backgroundGradientTo:   '#2C3A28',
+          backgroundColor:        '#EFE0CC',
+          backgroundGradientFrom: '#EFE0CC',
+          backgroundGradientTo:   '#EFE0CC',
           decimalPlaces: 0,
           color: (o = 1) => `rgba(${hexRgb},${o})`,
           labelColor: (o = 1) => `rgba(181,186,175,${o})`,
@@ -1631,24 +1638,16 @@ export default function HomeScreen() {
           {/* ── Calm Zone ── */}
           {renderCalmZone()}
 
-          {/* ── 불안 개입 배너 ── */}
-          {renderAnxietyBanner()}
-
-          {/* ── 주간 체크인 카드 ── */}
-          {renderCheckInCard()}
-
-          {/* ── 오늘의 미니 루틴 ── */}
-          {renderDailyRoutines()}
-
           {/* ── 오늘의 상태 척도 ── */}
-          <LinearGradient colors={['#5A6A45', '#3C4E2A']} style={s.card} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+          <LinearGradient colors={['rgba(255,255,255,0.96)', 'rgba(99,119,70,0.09)']} style={s.card} start={{ x: 0.1, y: 0 }} end={{ x: 1, y: 1 }}>
+            <View style={s.cardHighlightStrip} pointerEvents="none" />
             <View style={s.cardTitleRow}>
               <View style={{ flex: 1 }}>
                 <Text style={s.cardTitle}>오늘의 상태 척도</Text>
-                <Text style={s.cardDesc}>1(낮음) ~ 10(높음)으로 표시해 주세요.</Text>
+                <Text style={[s.cardDesc, { marginBottom: 8 }]}>1(낮음) ~ 10(높음)으로 표시해 주세요.</Text>
               </View>
               <TouchableOpacity style={s.assessMiniBtn} onPress={() => router.push('/(surveys)/evaluation-hub' as any)} activeOpacity={0.8}>
-                <ClipboardList size={12} color="rgba(255,255,255,0.6)" />
+                <ClipboardList size={12} color={C.olive} />
                 <Text style={s.assessMiniBtnText}>정밀 평가</Text>
               </TouchableOpacity>
             </View>
@@ -1659,8 +1658,8 @@ export default function HomeScreen() {
                     <Text style={s.emoji}>{def.emoji}</Text>
                     <Text style={s.sliderLabel}>{def.label}</Text>
                   </View>
-                  <View style={[s.badge, { backgroundColor: def.color + '44' }]}>
-                    <Text style={[s.badgeText, { color: C.white }]}>{sliders[def.key]}점</Text>
+                  <View style={[s.badge, { backgroundColor: def.color + '1E' }]}>
+                    <Text style={[s.badgeText, { color: def.color }]}>{sliders[def.key]}점</Text>
                   </View>
                 </View>
                 <CustomSlider value={sliders[def.key]} color={def.color} onCommit={val => onSliderChange(def.key, val)} />
@@ -1671,6 +1670,9 @@ export default function HomeScreen() {
               </View>
             ))}
           </LinearGradient>
+
+          {/* ── 불안 개입 배너 ── */}
+          {renderAnxietyBanner()}
 
           {/* ── 감정 태그 ── */}
           <View style={s.card}>
@@ -1714,10 +1716,16 @@ export default function HomeScreen() {
 
           {/* ── 저장 버튼 ── */}
           <TouchableOpacity onPress={handleSave} activeOpacity={0.85} style={{ borderRadius: 100, overflow: 'hidden', marginTop: 4 }}>
-            <LinearGradient colors={['#9BAD80', '#748558']} style={s.saveBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+            <LinearGradient colors={['#637746', '#45582F']} style={s.saveBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
               <Text style={s.saveBtnText}>{todayLogId !== null ? '기록 업데이트하기' : '기록 저장하기'}</Text>
             </LinearGradient>
           </TouchableOpacity>
+
+          {/* ── 오늘의 미니 루틴 ── */}
+          {renderDailyRoutines()}
+
+          {/* ── 주간 체크인 카드 ── */}
+          {renderCheckInCard()}
 
           {/* ── 수면 루틴 (컴팩트) ── */}
           {renderSleepSection()}
@@ -1742,14 +1750,6 @@ export default function HomeScreen() {
       {/* ── 루틴 편집 모달 ── */}
       {renderRoutineEditModal()}
 
-      {/* ── 목표 설정 FAB ── */}
-      <TouchableOpacity
-        style={s.goalFab}
-        onPress={() => router.push('/goal-setting' as any)}
-        activeOpacity={0.85}
-      >
-        <Text style={s.goalFabText}>🎯</Text>
-      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -1762,27 +1762,30 @@ const s = StyleSheet.create({
   content: { paddingHorizontal: CARD_MX, paddingTop: 8, paddingBottom: 16 },
 
   // Calm Zone
-  calmZone:    { borderRadius: 26, padding: 22, marginBottom: 18, overflow: 'hidden', position: 'relative' },
+  calmZoneShadow: { borderRadius: 22, marginBottom: 14, shadowOffset: { width: 0, height: 7 }, shadowOpacity: 0.32, shadowRadius: 18, elevation: 7 },
+  calmZone:    { borderRadius: 22, padding: 14, overflow: 'hidden', position: 'relative', borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)' },
+  calmHighlight: { position: 'absolute', top: 0, left: 0, right: 0, height: 1.5, backgroundColor: 'rgba(255,255,255,0.55)' },
   calmRow:     { flexDirection: 'row', alignItems: 'center' },
-  calmLeft:    { flex: 1, paddingRight: 10 },
-  calmRight:   { width: 110, alignItems: 'center', backgroundColor: 'transparent' },
-  calmEmoji:   { fontSize: 22, marginBottom: 6 },
-  calmGreeting:{ fontSize: 17, fontWeight: '500', color: C.white, marginBottom: 4, letterSpacing: -0.2 },
-  calmDate:    { fontSize: 11, color: 'rgba(255,255,255,0.65)', marginBottom: 9 },
-  calmQuestion:{ fontSize: 13, color: 'rgba(255,255,255,0.8)', fontWeight: '400', lineHeight: 20 },
+  calmLeft:    { flex: 1, paddingRight: 8 },
+  calmRight:   { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'transparent' },
+  calmTreeInfo:{ flex: 1, justifyContent: 'center', gap: 5 },
+  calmEmoji:   { fontSize: 16, marginBottom: 4 },
+  calmGreeting:{ fontSize: 14, fontWeight: '500', color: C.white, marginBottom: 2, letterSpacing: -0.1 },
+  calmDate:    { fontSize: 10, color: 'rgba(255,255,255,0.60)', marginBottom: 6 },
+  calmQuestion:{ fontSize: 12, color: 'rgba(255,255,255,0.78)', fontWeight: '400', lineHeight: 18 },
 
   // Olive Tree Tamagotchi
-  careBadge:            { backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 9, paddingVertical: 4, borderRadius: 12, marginBottom: 10 },
-  careBadgeText:        { fontSize: 11, color: C.white, fontWeight: '500' },
-  treeContainer:        { width: 80, height: 80, alignItems: 'center', justifyContent: 'center', position: 'relative', marginBottom: 8, backgroundColor: 'transparent', overflow: 'visible' },
-  treeImage:            { width: 72, height: 72, backgroundColor: 'transparent', overflow: 'visible' },
-  treeMessage:          { fontSize: 10, color: 'rgba(255,255,255,0.7)', textAlign: 'center', lineHeight: 14, fontWeight: '400', maxWidth: 108 },
+  careBadge:            { backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 10, alignSelf: 'flex-start' },
+  careBadgeText:        { fontSize: 10, color: C.white, fontWeight: '500' },
+  treeContainer:        { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', position: 'relative', backgroundColor: 'transparent', overflow: 'visible' },
+  treeImage:            { width: 44, height: 44, backgroundColor: 'transparent', overflow: 'visible' },
+  treeMessage:          { fontSize: 10, color: 'rgba(255,255,255,0.72)', lineHeight: 14, fontWeight: '400' },
   treeMessageHarvest:   { color: '#FFCF60', fontWeight: '600' },
   treeMessageWithered:  { color: 'rgba(255,255,255,0.45)', fontStyle: 'italic' },
   oliveFruit:           { position: 'absolute', width: 8, height: 8, borderRadius: 4, backgroundColor: C.olive, shadowColor: '#FFFFFF', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.7, shadowRadius: 4, elevation: 4 },
 
   // Anxiety banner
-  anxietyBanner:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: C.oliveFaded, borderRadius: 18, paddingVertical: 15, paddingHorizontal: 18, marginBottom: 16, borderWidth: 1, borderColor: C.olive + '44' },
+  anxietyBanner:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(99,119,70,0.12)', borderRadius: 20, paddingVertical: 15, paddingHorizontal: 18, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(99,119,70,0.35)', shadowColor: C.olive, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.12, shadowRadius: 10, elevation: 3 },
   anxietyBannerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
   anxietyBannerTitle:{ fontSize: 14, fontWeight: '500', color: C.oliveDark },
   anxietyBannerDesc: { fontSize: 13, color: C.oliveDark, marginTop: 2, lineHeight: 19 },
@@ -1792,21 +1795,21 @@ const s = StyleSheet.create({
   sectionSub:     { fontSize: 13, color: C.textMuted, marginBottom: 16, lineHeight: 20 },
 
   // Card
-  card:      { backgroundColor: C.card, borderRadius: 26, padding: CARD_PAD + 2, marginBottom: 18, overflow: 'hidden', borderWidth: 0.5, borderColor: C.border, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 },
+  card:      { backgroundColor: C.card, borderRadius: 26, padding: CARD_PAD + 2, marginBottom: 18, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(231,221,203,0.85)', shadowColor: C.olive, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.18, shadowRadius: 14, elevation: 5 },
   cardTitle: { fontSize: 16, fontWeight: '500', color: C.text, marginBottom: 4, letterSpacing: -0.1 },
   cardDesc:  { fontSize: 13, color: C.textMuted, marginBottom: 18, lineHeight: 20 },
 
   // Sliders
-  sliderRow:     { paddingVertical: 16 },
+  sliderRow:     { paddingVertical: 10 },
   sliderDivider: { borderBottomWidth: 0.5, borderBottomColor: C.border },
-  sliderTop:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  sliderMeta:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  emoji:         { fontSize: 20 },
-  sliderLabel:   { fontSize: 15, fontWeight: '500', color: C.text },
-  badge:         { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12 },
-  badgeText:     { fontSize: 13, fontWeight: '600' },
-  axisRow:       { flexDirection: 'row', justifyContent: 'space-between', marginTop: 9 },
-  axisText:      { fontSize: 11, color: C.textMuted },
+  sliderTop:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  sliderMeta:    { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  emoji:         { fontSize: 17 },
+  sliderLabel:   { fontSize: 13, fontWeight: '500', color: C.text },
+  badge:         { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
+  badgeText:     { fontSize: 12, fontWeight: '600' },
+  axisRow:       { flexDirection: 'row', justifyContent: 'space-between', marginTop: 7 },
+  axisText:      { fontSize: 10, color: C.textMuted },
 
   // Chips
   chipWrap:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingBottom: 10 },
@@ -1824,7 +1827,7 @@ const s = StyleSheet.create({
   saveBtnText: { fontSize: 16, fontWeight: '500', color: C.white, letterSpacing: 0.3 },
 
   // Assessment cards
-  assessCard:      { backgroundColor: C.card, borderRadius: 20, padding: 18, marginBottom: 12, borderLeftWidth: 3, borderWidth: 0.5, borderColor: C.border, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
+  assessCard:      { backgroundColor: C.card, borderRadius: 20, padding: 18, marginBottom: 12, borderLeftWidth: 4, borderWidth: 1, borderColor: 'rgba(231,221,203,0.80)', shadowColor: C.olive, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.14, shadowRadius: 12, elevation: 4 },
   assessCardTop:   { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   assessCardTitle: { fontSize: 15, fontWeight: '500', color: C.text, marginBottom: 2 },
   assessCardSub:   { fontSize: 12, color: C.textMuted, marginBottom: 8 },
@@ -1856,7 +1859,7 @@ const s = StyleSheet.create({
 
   assessGuide:  { fontSize: 14, color: C.warmGray, lineHeight: 22, marginBottom: 22, fontStyle: 'italic' },
 
-  questionCard: { backgroundColor: C.card, borderRadius: 20, borderWidth: 0.5, borderColor: C.border, padding: 22, marginBottom: 26, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 },
+  questionCard: { backgroundColor: C.card, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(231,221,203,0.85)', padding: 22, marginBottom: 26, shadowColor: C.olive, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.16, shadowRadius: 14, elevation: 5 },
   questionNum:  { fontSize: 12, fontWeight: '500', color: C.olive, marginBottom: 10, letterSpacing: 0.4 },
   questionText: { fontSize: 16, color: C.text, lineHeight: 26, fontWeight: '400' },
 
@@ -1902,11 +1905,12 @@ const s = StyleSheet.create({
   assessMiniBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: 9, paddingVertical: 5, borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: C.oliveFaded,
+    borderWidth: 0.5, borderColor: 'rgba(99,119,70,0.35)',
     marginLeft: 8,
   },
-  assessMiniBtnText: { fontSize: 11, color: 'rgba(255,255,255,0.6)', fontWeight: '500' },
+  assessMiniBtnText: { fontSize: 11, color: C.olive, fontWeight: '500' },
+  cardHighlightStrip: { position: 'absolute', top: 0, left: 0, right: 0, height: 1, backgroundColor: 'rgba(255,255,255,0.85)' },
 
   // Sleep settings
   sleepRow:       { flexDirection: 'row', alignItems: 'center', gap: 12 },
@@ -1949,7 +1953,7 @@ const s = StyleSheet.create({
   categoryWords:{ fontSize: 13, color: C.textMuted, lineHeight: 20 },
 
   // Sleep settings modal
-  sleepInputCard: { backgroundColor: C.card, borderRadius: 26, borderWidth: 0.5, borderColor: C.border, padding: 22, marginBottom: 18 },
+  sleepInputCard: { backgroundColor: C.card, borderRadius: 26, borderWidth: 1, borderColor: 'rgba(231,221,203,0.85)', padding: 22, marginBottom: 18, shadowColor: C.olive, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.14, shadowRadius: 12, elevation: 4 },
   sleepInputLabel:{ fontSize: 15, fontWeight: '500', color: C.text, marginBottom: 10 },
   sleepInput:     { borderWidth: 1, borderColor: C.border, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13, fontSize: 22, fontWeight: '600', color: C.text, backgroundColor: C.bg, textAlign: 'center', letterSpacing: 2 },
   sleepInputHint: { fontSize: 12, color: C.textMuted, marginTop: 7, lineHeight: 18 },
@@ -1958,39 +1962,23 @@ const s = StyleSheet.create({
   sleepPreviewText:{ fontSize: 13, color: C.oliveDark, fontWeight: '400', textAlign: 'center', lineHeight: 20 },
 
   // ── Daily Routines ────────────────────────────────────────────────────────
-  // ── Goal FAB ──────────────────────────────────────────────────────────────
-  goalFab: {
-    position:        'absolute',
-    bottom:          88,
-    right:           20,
-    width:           52,
-    height:          52,
-    borderRadius:    26,
-    backgroundColor: C.oliveFaded,
-    borderWidth:     1,
-    borderColor:     C.olive + '60',
-    alignItems:      'center',
-    justifyContent:  'center',
-    shadowColor:     C.olive,
-    shadowOpacity:   0.25,
-    shadowRadius:    8,
-    shadowOffset:    { width: 0, height: 4 },
-    elevation:       6,
-  },
-  goalFabText: { fontSize: 22 },
-
   // ── Check-in card ─────────────────────────────────────────────────────────
   checkInCard: {
     flexDirection:    'row',
     alignItems:       'center',
     justifyContent:   'space-between',
     backgroundColor:  C.card,
-    borderRadius:     20,
+    borderRadius:     22,
     borderWidth:      1,
-    borderColor:      C.olive + '50',
+    borderColor:      'rgba(99,119,70,0.38)',
     paddingHorizontal: 18,
     paddingVertical:  16,
     marginBottom:     14,
+    shadowColor:      C.olive,
+    shadowOffset:     { width: 0, height: 4 },
+    shadowOpacity:    0.14,
+    shadowRadius:     12,
+    elevation:        4,
   },
   checkInLeft: {
     flexDirection: 'row',
@@ -2005,12 +1993,17 @@ const s = StyleSheet.create({
   routineCard: {
     backgroundColor:  C.card,
     borderRadius:     26,
-    borderWidth:      0.5,
-    borderColor:      C.border,
+    borderWidth:      1,
+    borderColor:      'rgba(231,221,203,0.85)',
     paddingHorizontal: CARD_PAD + 2,
     paddingTop:       14,
     paddingBottom:    6,
     marginBottom:     18,
+    shadowColor:      C.olive,
+    shadowOffset:     { width: 0, height: 4 },
+    shadowOpacity:    0.14,
+    shadowRadius:     12,
+    elevation:        4,
   },
   routineProgressTrack: {
     height:          4,
@@ -2072,6 +2065,26 @@ const s = StyleSheet.create({
     alignItems:        'center',
     justifyContent:    'space-between',
     marginBottom:      4,
+  },
+  routineHeaderBtns: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           6,
+  },
+  routineGoalBtn: {
+    flexDirection:     'row',
+    alignItems:        'center',
+    paddingHorizontal: 10,
+    paddingVertical:   5,
+    borderRadius:      12,
+    backgroundColor:   C.oliveFaded,
+    borderWidth:       1,
+    borderColor:       C.olive + '55',
+  },
+  routineGoalBtnText: {
+    fontSize:   12,
+    fontWeight: '600',
+    color:      C.oliveDark,
   },
   routineSettingsBtn: { padding: 4 },
 

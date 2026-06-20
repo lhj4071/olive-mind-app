@@ -328,7 +328,7 @@ const s = StyleSheet.create({
     backgroundColor: C.dangerDark, borderRadius: 10, padding: 12,
     borderWidth: 1, borderColor: C.dangerBorder,
   },
-  errorText:   { color: '#F8A0A0', fontSize: 13, lineHeight: 18, textAlign: 'center' },
+  errorText:   { color: C.danger, fontSize: 13, lineHeight: 18, textAlign: 'center' },
   successBox: {
     marginHorizontal: 20, marginTop: 16,
     backgroundColor: C.oliveFaded, borderRadius: 10, padding: 12,
@@ -352,7 +352,7 @@ const s = StyleSheet.create({
     paddingVertical: 15, alignItems: 'center',
   },
   btnDisabled:     { opacity: 0.6 },
-  primaryBtnText:  { color: '#1A2318', fontSize: 15, fontWeight: '700', letterSpacing: 0.2 },
+  primaryBtnText:  { color: C.white, fontSize: 15, fontWeight: '700', letterSpacing: 0.2 },
 
   switchLink: { marginTop: 16, alignItems: 'center' },
   switchLinkText: { color: C.textMuted, fontSize: 13 },

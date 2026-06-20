@@ -530,8 +530,8 @@ export default function MedsScreen() {
                 onPress={() => handleAlarm(med.drugId)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Bell size={12} color={activeNotif ? C.accent : '#7AABE0'} />
-                <Text style={[styles.medActionBtnText, { color: activeNotif ? C.accent : '#7AABE0' }]}>
+                <Bell size={12} color={activeNotif ? C.accent : C.phq9} />
+                <Text style={[styles.medActionBtnText, { color: activeNotif ? C.accent : C.phq9 }]}>
                   {activeNotif ? `알림 ${activeNotif.time} (켜짐)` : '알림 추가'}
                 </Text>
               </Pressable>
@@ -1108,7 +1108,7 @@ export default function MedsScreen() {
                   placeholder="예: 부작용으로 인한 중단" placeholderTextColor={C.dim}
                   multiline textAlignVertical="top"
                 />
-                <TouchableOpacity style={[styles.saveBtn, { backgroundColor: '#8B2020', marginTop: 20 }]} onPress={handleSaveStop}>
+                <TouchableOpacity style={[styles.saveBtn, { backgroundColor: C.danger, marginTop: 20 }]} onPress={handleSaveStop}>
                   <Text style={styles.saveBtnText}>복용 중단 확인</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.cancelLink} onPress={() => setStopModalVisible(false)}>
@@ -1250,7 +1250,7 @@ const styles = StyleSheet.create({
   deleteConfirmText:{ fontSize: 12, color: C.danger },
   medActionBtn:  { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 22, borderWidth: 0.5 },
   seBtn:         { borderColor: C.oliveDark, backgroundColor: C.oliveFaded },
-  alarmBtn:      { borderColor: '#253E50' },
+  alarmBtn:      { borderColor: C.border },
   alarmBtnActive:{ borderColor: C.accentBorder, backgroundColor: C.accentDark },
   dangerBtn:     { borderColor: C.dangerBorder },
   medActionBtnText: { fontSize: 12 },
@@ -1269,8 +1269,8 @@ const styles = StyleSheet.create({
   noteEntryLast: { borderBottomWidth: 0 },
   noteDate:      { fontSize: 11, color: C.muted, letterSpacing: 0.2 },
   noteBody:      { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', marginTop: 4, gap: 4 },
-  seTag:         { backgroundColor: '#302000', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2 },
-  seTagText:     { fontSize: 11, color: '#A87850' },
+  seTag:         { backgroundColor: 'rgba(176,127,78,0.14)', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2 },
+  seTagText:     { fontSize: 11, color: '#B07F4E' },
   noteMemo:      { fontSize: 13, color: C.text, lineHeight: 20 },
   emptyText:     { fontSize: 13, color: C.muted, textAlign: 'center', paddingVertical: 18 },
   chartLegend:   { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 10 },

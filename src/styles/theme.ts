@@ -3,32 +3,32 @@
 
 export const T = {
   // ── Colors ─────────────────────────────────────────────────────────────────
-  // 기존 대비 채도를 낮추고 따뜻한 다크 톤으로 조정
+  // 새벽(Dawn) 리스킨 — 따뜻한 크림 배경 + 프로스티드 글라스 카드
   colors: {
-    bg:          '#1E2720',   // 기존 #232D20 → 더 깊고 중립적인 다크 그린
-    card:        '#252E21',   // 기존 #2C3A28 → 채도 낮춤, 따뜻한 뉘앙스
-    cardRaised:  '#2C3628',   // 살짝 밝은 카드 (중첩 레이어용)
-    olive:       '#9BAD80',   // 기존 #A8B58F → 채도 10-15% 낮춤
-    oliveDark:   '#788A58',   // 기존 #839662 → 채도 낮춤
-    oliveFaded:  '#293323',   // 기존 #3A4A34 → 더 깊게
-    text:        '#E7E1D6',   // 기존 #F7F4EE → 따뜻한 크림 화이트 (눈 피로 감소)
-    textMuted:   '#8A9386',   // 기존 #B5BAAF → 더 차분하게
-    dim:         '#525B4D',   // 기존 #5A6A54 → 중립적
-    border:      '#2C3728',   // 기존 #3A4A34 → 부드러운 경계
+    bg:          '#F4E8D6',   // 따뜻한 크림 배경
+    card:        'rgba(255,255,255,0.72)',   // 프로스티드 글라스 (RN: backdrop-filter 없음, 반투명 흰색으로 근사)
+    cardRaised:  'rgba(255,255,255,0.82)',   // 살짝 더 불투명한 레이어
+    olive:       '#637746',   // 채도 낮춘 새벽 올리브
+    oliveDark:   '#45582F',   // 깊은 올리브
+    oliveFaded:  'rgba(99,119,70,0.15)',  // 올리브 페이드 (투명)
+    text:        '#34372C',   // 다크 그린-브라운 텍스트
+    textMuted:   '#84826E',   // 뮤트 텍스트
+    dim:         '#ABA897',   // 딤 텍스트 / 비활성 아이콘
+    border:      '#E7DDCB',   // 따뜻한 크림 경계선
     white:       '#FFFFFF',
 
-    // 시맨틱 컬러 (채도 낮춤)
-    phq9:        '#5D7F9A',   // 기존 #6A8CA0 → 더 차분한 블루
-    gad7:        '#B0835A',   // 기존 #C4956A → 더 차분한 앰버
-    danger:      '#B86868',   // 기존 #F08080 → 더 차분한 레드
-    dangerDark:  '#3E1A1A',
-    dangerBorder:'#5C2020',
-    accent:      '#7A6FA8',   // 기존 #9B91E0 → 더 차분한 퍼플
-    accentDark:  '#28253C',
-    accentBorder:'#5A527A',
-    green:       '#9BAD80',   // olive와 동일
-    purple:      '#5A4FA0',
-    purpleDark:  '#32305C',
+    // 시맨틱 컬러
+    phq9:        '#5C7C97',   // 차분한 블루
+    gad7:        '#B07F4E',   // 따뜻한 앰버
+    danger:      '#BF6B6B',   // 소프트 레드
+    dangerDark:  'rgba(191,107,107,0.10)',
+    dangerBorder:'rgba(191,107,107,0.28)',
+    accent:      '#7A6FA8',   // 라벤더 퍼플
+    accentDark:  'rgba(122,111,168,0.10)',
+    accentBorder:'rgba(122,111,168,0.28)',
+    green:       '#637746',   // olive와 동일
+    purple:      '#7A6FA8',
+    purpleDark:  'rgba(122,111,168,0.10)',
   },
 
   // ── Typography ─────────────────────────────────────────────────────────────
@@ -73,22 +73,23 @@ export const T = {
   },
 
   // ── Shadows ─────────────────────────────────────────────────────────────────
-  // 부드럽고 낮은 그림자 (deep shadow 지양)
+  // 올리브 컬러 그림자 — Calm앱 수준의 깊이감 (black 그림자 대신 브랜드 컬러 사용)
   shadow: {
-    sm:  { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4,  elevation: 1 },
-    md:  { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8,  elevation: 2 },
-    lg:  { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.09, shadowRadius: 14, elevation: 4 },
+    sm:  { shadowColor: '#637746', shadowOffset: { width: 0, height: 2  }, shadowOpacity: 0.12, shadowRadius: 6,  elevation: 2 },
+    md:  { shadowColor: '#637746', shadowOffset: { width: 0, height: 4  }, shadowOpacity: 0.16, shadowRadius: 12, elevation: 4 },
+    lg:  { shadowColor: '#637746', shadowOffset: { width: 0, height: 8  }, shadowOpacity: 0.22, shadowRadius: 20, elevation: 7 },
+    xl:  { shadowColor: '#637746', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.28, shadowRadius: 28, elevation: 10 },
   },
 
   // ── Gradients ───────────────────────────────────────────────────────────────
-  // 채도 낮춘 그라디언트 쌍
+  // 새벽 팔레트 그라디언트
   gradients: {
-    mood:   ['#6E7E50', '#4A5830'] as [string, string],
-    sleep:  ['#3E5468', '#273848'] as [string, string],
-    breath: ['#4A6A78', '#2E4855'] as [string, string],
-    accent: ['#C07838', '#8A5020'] as [string, string],
-    button: ['#9BAD80', '#788A58'] as [string, string],
-    danger: ['#8B2020', '#6A1818'] as [string, string],
+    mood:   ['#637746', '#45582F'] as [string, string],
+    sleep:  ['#5C7C97', '#3E5470'] as [string, string],
+    breath: ['#5C7C97', '#3E5470'] as [string, string],
+    accent: ['#B07F4E', '#8A5A28'] as [string, string],
+    button: ['#637746', '#45582F'] as [string, string],
+    danger: ['#BF6B6B', '#8A4545'] as [string, string],
   },
 } as const;
 

@@ -8,14 +8,14 @@ import { Tabs, router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Home, Pill, Wrench, BookOpen, BarChart2, Moon, Wind } from 'lucide-react-native';
 
-const ACTIVE   = '#9BAD80';   // desaturated olive
-const INACTIVE = '#525B4D';   // muted dim
+const ACTIVE   = '#637746';   // dawn olive
+const INACTIVE = '#ABA897';   // dawn dim
 
-const SLEEP_BG         = '#191E17';
-const SLEEP_TEXT_MAIN  = '#E4DFD4';
-const SLEEP_TEXT_SUB   = 'rgba(228, 223, 212, 0.5)';
-const SLEEP_BTN_BG     = 'rgba(112, 128, 86, 0.2)';
-const SLEEP_BTN_BORDER = 'rgba(112, 128, 86, 0.45)';
+const SLEEP_BG         = '#1E1A14';
+const SLEEP_TEXT_MAIN  = '#E7DDCC';
+const SLEEP_TEXT_SUB   = 'rgba(231,221,204,0.55)';
+const SLEEP_BTN_BG     = 'rgba(99,119,70,0.15)';
+const SLEEP_BTN_BORDER = 'rgba(99,119,70,0.38)';
 
 interface SleepRow { bedTime: string; wakeTime: string; }
 
@@ -76,12 +76,17 @@ export default function TabLayout() {
           tabBarActiveTintColor:   ACTIVE,
           tabBarInactiveTintColor: INACTIVE,
           tabBarStyle: {
-            backgroundColor: '#1A2218',
-            borderTopColor:  '#2C3728',
+            backgroundColor: 'rgba(255,255,255,0.92)',
+            borderTopColor:  '#E7DDCB',
             borderTopWidth:  0.5,
             paddingTop:      7,
             paddingBottom:   7,
             height:          62,
+            shadowColor:     '#637746',
+            shadowOffset:    { width: 0, height: -3 },
+            shadowOpacity:   0.10,
+            shadowRadius:    12,
+            elevation:       16,
           },
           tabBarLabelStyle: { fontSize: 10, fontWeight: '500', letterSpacing: 0.1 },
         }}

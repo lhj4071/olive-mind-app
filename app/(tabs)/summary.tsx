@@ -20,10 +20,10 @@ import { FadeInView } from '../../src/components/DS';
 const { width: SCREEN_W } = Dimensions.get('window');
 
 const SLIDER_META = [
-  { key: 'mood',         emoji: '😊', label: '기분',   color: '#A8B58F' },
-  { key: 'anxiety',      emoji: '😰', label: '불안',   color: '#C4956A' },
+  { key: 'mood',         emoji: '😊', label: '기분',   color: C.olive  },
+  { key: 'anxiety',      emoji: '😰', label: '불안',   color: C.gad7   },
   { key: 'irritability', emoji: '😤', label: '예민도', color: '#A08260' },
-  { key: 'sleep',        emoji: '😴', label: '수면',   color: '#6A8CA0' },
+  { key: 'sleep',        emoji: '😴', label: '수면',   color: C.phq9   },
 ] as const;
 
 const EMOTION_TAG_MAP: Record<string, string> = {
@@ -252,7 +252,7 @@ export default function SummaryScreen() {
         <Text style={s.sectionTitle}>7일 상태 변화</Text>
 
         {hasChartData ? (
-          <LinearGradient colors={['#3A5060', '#263848']} style={s.chartCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+          <LinearGradient colors={[C.card, C.bg]} style={s.chartCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
             <LineChart
               data={chartData}
               width={SCREEN_W - 40}
@@ -415,6 +415,8 @@ const s = StyleSheet.create({
     paddingRight:    12,
     marginBottom:    10,
     overflow:        'hidden',
+    borderWidth:     0.5,
+    borderColor:     C.border,
   },
   chart: { borderRadius: 12 },
   emptyChart: {
@@ -491,7 +493,7 @@ const s = StyleSheet.create({
     padding:         18,
     marginBottom:    10,
   },
-  seCard:    { borderLeftWidth: 2.5, borderLeftColor: '#9A7248' },
+  seCard:    { borderLeftWidth: 2.5, borderLeftColor: C.gad7 },
   cardLabel: {
     fontSize:      11,
     fontWeight:    '500',
@@ -535,13 +537,13 @@ const s = StyleSheet.create({
   },
   seEntryLast: { borderBottomWidth: 0, paddingBottom: 0 },
   seBadge: {
-    backgroundColor:   '#2A1E00',
+    backgroundColor:   'rgba(176,127,78,0.14)',
     borderRadius:      20,
     paddingHorizontal: 8,
     paddingVertical:   3,
     flexShrink:        0,
   },
-  seBadgeText: { fontSize: 12, color: '#A07848', fontWeight: '500' },
+  seBadgeText: { fontSize: 12, color: C.gad7, fontWeight: '500' },
   seBody:      { flex: 1 },
   seDrug:      { fontSize: 13, fontWeight: '500', color: C.text },
   seMemo:      { fontSize: 12, color: C.textMuted, marginTop: 2, lineHeight: 18 },

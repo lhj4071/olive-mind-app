@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react';
-import { Platform, StyleSheet } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SQLiteProvider, defaultDatabaseDirectory, useSQLiteContext } from 'expo-sqlite';
@@ -90,15 +91,44 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={s.root}>
-      <SQLiteProvider
-        databaseName="olive-mind.db"
-        directory={dbDirectory}
-        onInit={initializeDatabase}
+      <LinearGradient
+        colors={['#F6EAD8', '#EFE0CC', '#E9DCC8']}
+        locations={[0, 0.52, 1]}
+        style={s.root}
       >
-        <InnerLayout />
-      </SQLiteProvider>
+        {/* 환경광 블롭 — Calm 앱 수준의 배경 깊이감 */}
+        <View style={s.blobTopRight} pointerEvents="none" />
+        <View style={s.blobBottomLeft} pointerEvents="none" />
+        <SQLiteProvider
+          databaseName="olive-mind.db"
+          directory={dbDirectory}
+          onInit={initializeDatabase}
+        >
+          <InnerLayout />
+        </SQLiteProvider>
+      </LinearGradient>
     </GestureHandlerRootView>
   );
 }
 
-const s = StyleSheet.create({ root: { flex: 1 } });
+const s = StyleSheet.create({
+  root: { flex: 1 },
+  blobTopRight: {
+    position:        'absolute',
+    top:             -140,
+    right:           -100,
+    width:           340,
+    height:          340,
+    borderRadius:    170,
+    backgroundColor: 'rgba(255, 205, 140, 0.22)',
+  },
+  blobBottomLeft: {
+    position:        'absolute',
+    bottom:          60,
+    left:            -120,
+    width:           280,
+    height:          280,
+    borderRadius:    140,
+    backgroundColor: 'rgba(99, 119, 70, 0.10)',
+  },
+});

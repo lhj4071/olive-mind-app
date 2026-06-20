@@ -108,7 +108,7 @@ const SEVERITIES: readonly SeverityDef[] = [
     key:   'mild',
     label: '경도',
     desc:  '일상생활 가능',
-    color: C.olive,       // #9BAD80 — 안심 그린
+    color: C.olive,
     bgDim: C.oliveFaded,
   },
   {

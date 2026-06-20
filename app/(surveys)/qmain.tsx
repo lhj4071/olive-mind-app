@@ -19,7 +19,7 @@ const SURVEYS = [
     id: 'survey2', route: '/(surveys)/survey2',
     eyebrow: 'Survey 2', title: '음주·신체·PMS 평가',
     desc: '음주(AUDIT) · 신체증상(PHQ-15) · 월경전증상(PSST)',
-    icon: '💊', color: '#9BAD80', time: '10–15분',
+    icon: '💊', color: C.olive, time: '10–15분',
   },
   {
     id: 'survey3', route: '/(surveys)/survey3',
@@ -37,7 +37,7 @@ const SURVEYS = [
     id: 'survey5', route: '/(surveys)/survey5',
     eyebrow: 'Survey 5', title: '기질·성격·회복탄력성',
     desc: '기질(TEMPS-A) · 성격병리(PID-5-BF) · 회복탄력성(CD-RISC)',
-    icon: '♟️', color: '#9BAD80', time: '15–20분',
+    icon: '♟️', color: C.olive, time: '15–20분',
   },
   {
     id: 'survey6', route: '/(surveys)/survey6',

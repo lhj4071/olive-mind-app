@@ -148,11 +148,11 @@ const ds = StyleSheet.create({
   card: {
     backgroundColor: T.colors.card,
     borderRadius:    T.radius.lg,
-    borderWidth:     0.5,
-    borderColor:     T.colors.border,
+    borderWidth:     1,
+    borderColor:     'rgba(231,221,203,0.85)',
     padding:         T.space.md + 2,
     marginBottom:    T.space.md,
-    ...T.shadow.sm,
+    ...T.shadow.md,
   },
   header: {
     flexDirection:     'row',
